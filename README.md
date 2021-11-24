@@ -7,10 +7,7 @@
 * Apk:    'Install apk' and 'Uninstall apk'
 * File:   'Push file', 'Pull file' and 'Delete file'
 
-* Logcat:
-* Option to show output using app's Process Id
-* Color highlighting for Error and Warning messages
-* Filter option to block unwanted tags
+* Logcat:  Option to show output using app's Process Id. Color highlighting for Error and Warning messages. Filter option to block unwanted tags
 
 * Screen Capture / Camera:    'Take screenshot', 'Pull screenshot', 'Screen Record' and 'Pull camera image'
 * Command:    'List PIDs', 'List Packages', 'getprop' and 'Adb Command' Dialog
