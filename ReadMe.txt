@@ -14,8 +14,8 @@ ADB_Util
     so you have to wait till it re-connects and do "Home->Select Device".
     
 Logcat:
-    For Logcat you can use the Process Id setting to help reduce the
-    log output and only show output related to your Process.
+    For Logcat can choose to just view log output from the running Process Id,
+	there can be a delay before it starts sending output.
     Normally with logcat you can let it run until it slows down, and
     then you can start your Process.
 
@@ -57,10 +57,10 @@ Wireless:
 
 Release notes:
 
-    ADB_Util 1.1.1:
-        The File browser's support for double clicking the selection now works.
-        
     ADB_Util 1.1.2:
         Fixed "File->Push file".
         Improved "Home->Select Device".
+        
+    ADB_Util 1.1.3:
+        Tried to improve the Process Id logcat.
         

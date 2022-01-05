@@ -5,7 +5,7 @@
 /**
  *	  ADB_Util is a utility for Android ADB
  *
- *	  Copyright (c) 2021 Joseph Siebenmann
+ *	  Copyright (c) 2022 Joseph Siebenmann
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the GNU General  Public License as published by
@@ -260,7 +260,7 @@ public class ADB_Util
 	static final String GETPROP = "getprop";
 	static final String ADB_COMMAND = "Adb Command";
 	static final String REBOOT = "Reboot";
-	static final String REBOOT_RECOVERY = "Reboot Recovery";
+	static final String REBOOT_RECOVERY = "Reboot to Recovery";
 	static final String SELECT_DEVICE = "Select Device";
 	static final String PULL_FILE = "Pull file";
 	static final String PUSH_FILE = "Push file";
@@ -413,7 +413,7 @@ public class ADB_Util
 		JMenu rebootMenu = new JMenu("Reboot");
 		JMenuItem rebootMenuItem = new JMenuItem("Reboot");
 		rebootMenuItem.addActionListener(actListener);
-		JMenuItem rebootRecoveryMenuItem = new JMenuItem("Reboot Recovery");
+		JMenuItem rebootRecoveryMenuItem = new JMenuItem("Reboot to Recovery");
 		rebootRecoveryMenuItem.addActionListener(actListener);
 		
 		JMenu logcatMenu = new JMenu("Logcat");
@@ -935,20 +935,25 @@ public class ADB_Util
                     else
                         System.out.println("lineSb.length(): "+lineSb.length());
 /**/                            
-                            
-					// Without this, console output
-					// can get really laggy and unresponsive..
-					if ( lineSb.length() < 4096 )
-						Thread.sleep(10);
-					else
-					{
-						if ( lDif > 0 )
-							Thread.sleep(40);
-							//Thread.sleep(45);
-						else
-							//Thread.sleep(30);
-							Thread.sleep(20);
-					}
+ 
+                    if ( (sUsePidLogcat != null) && (sUsePidLogcat.equals("true")) )
+                        ;
+                    else
+                    {
+                        // Without this, console output
+                        // can get really laggy and unresponsive..
+                        if ( lineSb.length() < 4096 )
+                            Thread.sleep(10);
+                        else
+                        {
+                            if ( lDif > 0 )
+                                Thread.sleep(40);
+                                //Thread.sleep(45);
+                            else
+                                //Thread.sleep(30);
+                                Thread.sleep(20);
+                        }
+                    }
 
 					if ( (lineSb != null) && (iBytesRead > 0) )
 					{
@@ -4923,7 +4928,7 @@ INNER_BREAK:
                     sc.bConnected = true;
                     
                     sDeviceName = (String)DevicesAr.get(0);
-                    System.out.println("sDeviceName: '"+sDeviceName+"'");
+                    //System.out.println("sDeviceName: '"+sDeviceName+"'");
 
                     // Load Status bar..
                     if ( (sDeviceName != null) && (sDeviceName.length() > 0) )
@@ -5730,7 +5735,7 @@ INNER_BREAK:
 		}
 	}; //}}}
 
-	//{{{    MouseListener  jListMouseListener
+	//{{{   MouseListener  jListMouseListener
 	MouseListener jListMouseListener = new MouseAdapter()
 	{
 		public void mouseClicked(MouseEvent e)
