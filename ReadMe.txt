@@ -10,7 +10,7 @@ ADB_Util
     For 'Apk->Install apk' you must have 'Unknown sources' turned on in Security.
 
     ** Note **
-    After you do "Reboot" or "Reboot Recovery" it will lose any Device Id,
+    After you do "Reboot" or "Reboot to Recovery" it will lose any Device Id,
     so you have to wait till it re-connects and do "Home->Select Device".
     
 Logcat:
@@ -35,6 +35,9 @@ Select Device:
     Allows you to select the target device, or Emulator, for Logcat output,
     Uninstall and Install Apk, if you are running more than one.
     The currently selected device is shown in the lower status bar.
+    
+Devices:
+    Shows current devices, useful for checking wireless connection.
 
 Wireless:
     Allows you to use adb wireless over Wi-Fi, no root required.
@@ -57,10 +60,17 @@ Wireless:
 
 Release notes:
 
-    ADB_Util 1.1.2:
-        Fixed "File->Push file".
-        Improved "Home->Select Device".
-        
     ADB_Util 1.1.3:
         Tried to improve the Process Id logcat.
+        
+    ADB_Util 1.1.4:
+        Added "Home->Devices" to show current devices,
+        useful for checking connection for wireless.
+        Tried to improve the Process Id logcat output.
+        Option to show selected package, for logcat, in Status Bar.
+
+        
+   Please let me know of any problems you find or features to add.
+   
+   joes0451@outlook.com
         

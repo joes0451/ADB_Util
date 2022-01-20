@@ -146,6 +146,7 @@ public class ADB_Util
     
 	private JLabel statusLabel;
 	private JLabel deviceLabel;
+	private JLabel packageLabel;
 	private JLabel statusPath;
     
     private static ADB_Util aDB_Util;
@@ -175,6 +176,7 @@ public class ADB_Util
     static volatile String sScreenRecordBitRate;
     static volatile String sScreenRecordVideoSize;
     static volatile String sScreenRecordShowVerbose;
+    static volatile String sShowPackageNameInStatusBar;
     
     static volatile String[] tokSa;
     
@@ -262,6 +264,7 @@ public class ADB_Util
 	static final String REBOOT = "Reboot";
 	static final String REBOOT_RECOVERY = "Reboot to Recovery";
 	static final String SELECT_DEVICE = "Select Device";
+	static final String DEVICES = "Devices";
 	static final String PULL_FILE = "Pull file";
 	static final String PUSH_FILE = "Push file";
 	static final String DELETE_FILE = "Delete file";
@@ -302,7 +305,7 @@ public class ADB_Util
                 (sOs.contains("nux")) ||
                 (sOs.contains("mac")))
 			iOS = LINUX_MAC;
-			
+		
 		CreateGui();
 		RefreshProperties();
 		
@@ -350,6 +353,58 @@ public class ADB_Util
 			}
 		}
     }   //}}}
+
+	//{{{	RefreshProperties()
+	private void RefreshProperties()
+	{
+	    //System.out.println("RefreshProperties()");
+		// Read Properties..
+		String sT = "";
+		Properties prop = new Properties();
+
+		try
+		{
+			prop.load(new FileInputStream("config.properties"));
+
+			// Get Property Values..
+			androidSdkPathS = processPath(prop.getProperty("android_sdk_path"));
+			sDownloadDir = processPath(prop.getProperty("download_dir"));
+			sScreenshotDir = processPath(prop.getProperty("screenshot_dir"));
+			sScreenRecordTimeLimit = processPath(prop.getProperty("screen_record_time_limit"));
+			sScreenRecordBitRate = processPath(prop.getProperty("screen_record_bit_rate"));
+			sScreenRecordVideoSize = processPath(prop.getProperty("screen_record_video_size"));
+			sScreenRecordShowVerbose = processPath(prop.getProperty("screen_record_use_verbose"));
+			
+			sCameraDir = processPath(prop.getProperty("camera_dir"));
+			sT = processPath(prop.getProperty("package_name"));
+			if ( (sT != null) && (! sT.equals("null")) && (sT.length() > 0) )
+			{
+                SingletonClass sc = SingletonClass.getInstance();
+                sc.sPackageName = sT;
+			}
+			
+			sUsePidLogcat = processPath(prop.getProperty("use_pid_logcat"));
+			sShowPackageNameInStatusBar = processPath(prop.getProperty("show_package_name_in_status_bar"));
+			
+			logcatFilterS = processPath(prop.getProperty("logcat_filter"));
+			sDeviceIPAddress = processPath(prop.getProperty("device_ip_address"));
+			sUseDirectScreenshotDownload = processPath(prop.getProperty("use_direct_screenshot_download"));
+			
+		}
+		catch (IOException ioe)
+		{
+			System.out.println("RefreshProperties() Exception");
+			ioe.printStackTrace();
+		}
+
+		StringBuffer sB = new StringBuffer();
+		sB.append("  ");
+		sB.append(androidSdkPathS);
+		statusLabel.setText(sB.toString());
+		
+		//System.out.println("Exiting RefreshProperties()");
+
+	} //}}}
     
 	//{{{	CreateGui()
 	public void CreateGui()
@@ -377,6 +432,8 @@ public class ADB_Util
 		JMenu homeMenu = new JMenu("Home");
 		JMenuItem selectDeviceMenuItem = new JMenuItem("Select Device");
 		selectDeviceMenuItem.addActionListener(actListener);
+		JMenuItem devicesMenuItem = new JMenuItem("Devices");
+		devicesMenuItem.addActionListener(actListener);
 
 		JMenu wirelessSubMenu = new JMenu("Wireless");
 		JMenuItem wirelessSubMenuItem = new JMenuItem("Re/Connect");
@@ -437,6 +494,7 @@ public class ADB_Util
 		deleteFileMenuItem.addActionListener(actListener);
 		
 		homeMenu.add(selectDeviceMenuItem);
+		homeMenu.add(devicesMenuItem);
 		homeMenu.add(wirelessSubMenu);
 		menuBar.add(homeMenu);
 		
@@ -543,6 +601,7 @@ public class ADB_Util
 		 */
 
 		Border loweredBevel = BorderFactory.createLoweredBevelBorder();
+		int iGridX = 0;
 
 		JPanel statusBar = new JPanel();
 		statusBar.setLayout(gridbag);
@@ -554,11 +613,13 @@ public class ADB_Util
 		gbc = new GridBagConstraints();
 		gbc.fill = GridBagConstraints.HORIZONTAL;
 		gbc.anchor = GridBagConstraints.WEST;
-		gbc.gridx = 0;
+		gbc.gridx = iGridX;
 		gbc.weightx = 1.0;
 		gbc.insets = new Insets(2, 2, 2, 2); // top left bottom right
 
 		statusBar.add(statusLabel, gbc);
+		
+		iGridX++;
 		
 		deviceLabel = new JLabel(" ");			// <-- (Set)
 		deviceLabel.setBorder(loweredBevel);
@@ -569,18 +630,58 @@ public class ADB_Util
 		gbc = new GridBagConstraints();
 		gbc.fill = GridBagConstraints.HORIZONTAL;
 		gbc.anchor = GridBagConstraints.WEST;
-		gbc.gridx = 1;
+		gbc.gridx = iGridX;
 		gbc.weightx = 0.1;
 		gbc.insets = new Insets(2, 2, 2, 2);	// top left bottom right
 		
 		statusBar.add(deviceLabel, gbc);
+		
+		iGridX++;
+
+		Properties prop = new Properties();
+
+		try
+		{
+			prop.load(new FileInputStream("config.properties"));
+			sShowPackageNameInStatusBar = processPath(prop.getProperty("show_package_name_in_status_bar"));		
+		}
+		catch (IOException ioe)
+		{
+			System.out.println("RefreshProperties() Exception");
+			ioe.printStackTrace();
+		}
+		
+/*		
+		if ( sShowPackageNameInStatusBar == null )
+		    System.out.println("sShowPackageNameInStatusBar null");
+		else
+		    System.out.println("sShowPackageNameInStatusBar: '"+sShowPackageNameInStatusBar+"'");
+/**/		
+		
+        if ( (sShowPackageNameInStatusBar != null) && (sShowPackageNameInStatusBar.equals("true")) )
+        {
+            
+            packageLabel = new JLabel(" ");
+            packageLabel.setBorder(loweredBevel);
+    
+            gbc = new GridBagConstraints();
+            gbc.fill = GridBagConstraints.HORIZONTAL;
+            gbc.anchor = GridBagConstraints.WEST;
+            gbc.gridx = iGridX;
+            gbc.weightx = 1.0;
+            gbc.insets = new Insets(2, 2, 2, 2); // top left bottom right
+
+            statusBar.add(packageLabel, gbc);
+            
+            iGridX++;
+        }
 		
 		statusPath = new JLabel(" ");			// <-- (Set)
 		statusPath.setBorder(loweredBevel);
 		gbc = new GridBagConstraints();
 		gbc.fill = GridBagConstraints.HORIZONTAL;
 		gbc.anchor = GridBagConstraints.EAST;
-		gbc.gridx = 2;
+		gbc.gridx = iGridX;
 		gbc.weightx = 1.0;
 		gbc.insets = new Insets(2, 2, 2, 2);	// top left bottom right
 		
@@ -593,54 +694,6 @@ public class ADB_Util
         mainPanel.add(topPanel, BorderLayout.NORTH);
         mainPanel.add(cardPanel, BorderLayout.CENTER);
 		mainPanel.add(statusBar, BorderLayout.SOUTH);
-
-	} //}}}
-	
-	//{{{	RefreshProperties()
-	private void RefreshProperties()
-	{
-	    //System.out.println("RefreshProperties()");
-		// Read Properties..
-		String sT = "";
-		Properties prop = new Properties();
-
-		try
-		{
-			prop.load(new FileInputStream("config.properties"));
-
-			// Get Property Values..
-			androidSdkPathS = processPath(prop.getProperty("android_sdk_path"));
-			sDownloadDir = processPath(prop.getProperty("download_dir"));
-			sScreenshotDir = processPath(prop.getProperty("screenshot_dir"));
-			sScreenRecordTimeLimit = processPath(prop.getProperty("screen_record_time_limit"));
-			sScreenRecordBitRate = processPath(prop.getProperty("screen_record_bit_rate"));
-			sScreenRecordVideoSize = processPath(prop.getProperty("screen_record_video_size"));
-			sScreenRecordShowVerbose = processPath(prop.getProperty("screen_record_use_verbose"));
-			
-			sCameraDir = processPath(prop.getProperty("camera_dir"));
-			sT = processPath(prop.getProperty("package_name"));
-			if ( (sT != null) && (! sT.equals("null")) && (sT.length() > 0) )
-			{
-                SingletonClass sc = SingletonClass.getInstance();
-                sc.sPackageName = sT;
-			}
-			
-			sUsePidLogcat = processPath(prop.getProperty("use_pid_logcat"));
-			logcatFilterS = processPath(prop.getProperty("logcat_filter"));
-			sDeviceIPAddress = processPath(prop.getProperty("device_ip_address"));
-			sUseDirectScreenshotDownload = processPath(prop.getProperty("use_direct_screenshot_download"));
-			
-		}
-		catch (IOException ioe)
-		{
-			System.out.println("RefreshProperties() Exception");
-			ioe.printStackTrace();
-		}
-
-		StringBuffer sB = new StringBuffer();
-		sB.append("  ");
-		sB.append(androidSdkPathS);
-		statusLabel.setText(sB.toString());
 
 	} //}}}
 
@@ -937,7 +990,10 @@ public class ADB_Util
 /**/                            
  
                     if ( (sUsePidLogcat != null) && (sUsePidLogcat.equals("true")) )
-                        ;
+                    {
+                        // This seems to make the PID logcat a little more responsive..
+                        Thread.sleep(5);
+                    }
                     else
                     {
                         // Without this, console output
@@ -4828,7 +4884,6 @@ INNER_BREAK:
 			    if ( (sListSelection != null) && (sListSelection.length() > 0) )
 			    {
 			        //System.out.println("sListSelection: '"+sListSelection+"'");
-			        
 			        if ( (sSelectedMenu != null) && (sSelectedMenu.equals("Select Package")) )
 			        {
 			            // Select Package..
@@ -4836,6 +4891,12 @@ INNER_BREAK:
                         SingletonClass sc = SingletonClass.getInstance();
                         sc.sPackageName = sListSelection;
 			            //System.out.println("sc.sPackageName: '"+sc.sPackageName+"'");
+
+                        if ( (sShowPackageNameInStatusBar != null) && (sShowPackageNameInStatusBar.equals("true")) )
+                        {
+                            if ( packageLabel != null )
+                                packageLabel.setText(sListSelection);
+                        }
 			        }
 			        else
 			        {
@@ -4958,6 +5019,62 @@ INNER_BREAK:
 				selectDeviceFrame.dispose();
                 
             }
+			else if ( DEVICES.equals(sActionCommand) )
+			{
+			    //System.out.println("DEVICES");
+				// Devices..
+				if ( bLogcatOn )
+				{
+                    // Set to kill IOBgThread..
+                    bBreakOut = true;
+                    
+                    // Wait for IOBgThread to end..
+                    while ( true )
+                    {
+                        try
+                        {
+                            Thread.sleep(100);
+                        }
+                        catch (InterruptedException ie)
+                        {
+                        }
+                        
+                        if ( ! bLogcatOn )
+                            break;
+                    }
+                    
+                    bLogcatOn = false;
+
+                    // Turn off status message..                    
+                    statusPath.setText("    ");
+				}
+				
+				sb = new StringBuffer();
+				
+				if ( iOS == LINUX_MAC )
+				{
+					sb.append("export PATH=${PATH}:");
+					sb.append(androidSdkPathS);
+					sb.append("/platform-tools");
+					
+					sb.append(";adb devices -l");
+				}
+				else
+				{
+					sb.append("SET PATH=");
+					sb.append(androidSdkPathS);
+					sb.append("/platform-tools");
+					sb.append(";%PATH%");
+				
+					sb.append("&&adb devices -l");
+					sb.append("\n");
+				}
+				
+				commandS = sb.toString();
+				
+				iOBgThread = new IOBgThread();
+				iOBgThread.start();
+			}
 			else if ( LOGCAT.equals(sActionCommand) )
 			{
 			    //System.out.println("LOGCAT");
