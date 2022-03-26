@@ -40,11 +40,12 @@ import javax.swing.filechooser.FileSystemView;
 import javax.swing.DefaultListModel;
 import javax.swing.*;
 import java.awt.Color;
-import java.awt.List;
+//import java.awt.List;
 import java.awt.Font;
 import java.awt.FlowLayout;
 import java.awt.CardLayout;
 import java.util.Iterator;
+import java.util.List;
 import java.io.File;
 
 import javax.swing.JMenu;
@@ -214,6 +215,8 @@ public class ADB_Util
     static ArrayList ConnectDevicesAr;
     static ArrayList fileToksAr;
     
+    static List<String> selectionList = new ArrayList<String>();
+    
     static CountDownLatch commandRequestLatch;
     static CountDownLatch completeLatch;
     
@@ -255,7 +258,7 @@ public class ADB_Util
 	static final int DISPLAY_BREAK_WIDTH = DISPLAY_WIDTH - 5;
 	
 	static final String TAKE_SCREENSHOT = "Take screenshot";
-	static final String PULL_SCREENSHOT = "Pull screenshot";
+	static final String PULL_SCREENSHOT = "Pull screenshots";
 	static final String SCREEN_RECORD = "Screen Record";
 	static final String LIST_PIDS = "List PIDs";
 	static final String LIST_PACKAGES = "List Packages";
@@ -265,13 +268,13 @@ public class ADB_Util
 	static final String REBOOT_RECOVERY = "Reboot to Recovery";
 	static final String SELECT_DEVICE = "Select Device";
 	static final String DEVICES = "Devices";
-	static final String PULL_FILE = "Pull file";
+	static final String PULL_FILE = "Pull files";
 	static final String PUSH_FILE = "Push file";
-	static final String DELETE_FILE = "Delete file";
+	static final String DELETE_FILE = "Delete files";
 	static final String WIRELESS_CONNECT = "wireless_connect";
 	static final String WIRELESS_DISCONNECT = "wireless_disconnect";
 	static final String LOGCAT = "Start/Stop Logcat";
-	static final String PULL_CAMERA_IMAGE = "Pull camera image";
+	static final String PULL_CAMERA_IMAGE = "Pull camera images";
 	static final String SELECT_PACKAGE = "Select Package";
 	
 	static final String PULL_CAMERA_IMAGE_SUBMIT = "pull_camera_image_submit";
@@ -450,11 +453,11 @@ public class ADB_Util
 		JMenu screenshotMenu = new JMenu("Screen Capture/Camera");
 		JMenuItem takeScreenshotMenuItem = new JMenuItem("Take screenshot");
 		takeScreenshotMenuItem.addActionListener(actListener);
-		JMenuItem pullScreenshotMenuItem = new JMenuItem("Pull screenshot");
+		JMenuItem pullScreenshotMenuItem = new JMenuItem("Pull screenshots");
 		pullScreenshotMenuItem.addActionListener(actListener);
 		JMenuItem screenRecordMenuItem = new JMenuItem("Screen Record");
 		screenRecordMenuItem.addActionListener(actListener);
-		JMenuItem pullCameraImageMenuItem = new JMenuItem("Pull camera image");
+		JMenuItem pullCameraImageMenuItem = new JMenuItem("Pull camera images");
 		pullCameraImageMenuItem.addActionListener(actListener);
 
 		JMenu commandMenu = new JMenu("Command");
@@ -488,9 +491,9 @@ public class ADB_Util
 		JMenu fileMenu = new JMenu("File");
 		JMenuItem pushFileMenuItem = new JMenuItem("Push file");
 		pushFileMenuItem.addActionListener(actListener);
-		JMenuItem pullFileMenuItem = new JMenuItem("Pull file");
+		JMenuItem pullFileMenuItem = new JMenuItem("Pull files");
 		pullFileMenuItem.addActionListener(actListener);
-		JMenuItem deleteFileMenuItem = new JMenuItem("Delete file");
+		JMenuItem deleteFileMenuItem = new JMenuItem("Delete files");
 		deleteFileMenuItem.addActionListener(actListener);
 		
 		homeMenu.add(selectDeviceMenuItem);
@@ -3198,7 +3201,7 @@ INNER_BREAK:
 		screenshotFrame = new JFrame();
 		screenshotFrame.setLayout(new BorderLayout());
 		screenshotFrame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
-		screenshotFrame.setTitle("Pull Screenshot");
+		screenshotFrame.setTitle("Pull Screenshots");
 
 		int iGridY;
 		int iSz = 0;
@@ -3223,7 +3226,8 @@ INNER_BREAK:
 		
 		screenshotFilesJList.setFont(new Font("Monospaced", Font.BOLD, FONT_SIZE));
 		screenshotFilesJList.setVisibleRowCount(8);
-		screenshotFilesJList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+		//screenshotFilesJList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+		screenshotFilesJList.setSelectionMode(ListSelectionModel.MULTIPLE_INTERVAL_SELECTION);
 		screenshotFilesJList.addListSelectionListener(selectionListener);
 		
 		scrollPane.getViewport().setView(screenshotFilesJList);
@@ -3265,7 +3269,7 @@ INNER_BREAK:
 		cameraFrame = new JFrame();
 		cameraFrame.setLayout(new BorderLayout());
 		cameraFrame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
-		cameraFrame.setTitle("Pull camera image");
+		cameraFrame.setTitle("Pull camera images");
 
 		int iGridY;
 		int iSz = 0;
@@ -3287,7 +3291,8 @@ INNER_BREAK:
 		cameraImagesJList = new JList(tokSa);
 		cameraImagesJList.setFont(new Font("Monospaced", Font.BOLD, FONT_SIZE));
 		cameraImagesJList.setVisibleRowCount(8);
-		cameraImagesJList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+		//cameraImagesJList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+		cameraImagesJList.setSelectionMode(ListSelectionModel.MULTIPLE_INTERVAL_SELECTION);
 		cameraImagesJList.addListSelectionListener(selectionListener);
 		
 		scrollPane.getViewport().setView(cameraImagesJList);
@@ -3634,7 +3639,8 @@ INNER_BREAK:
         {
             fileBrowserJList.setFont(new Font("Monospaced", Font.BOLD, FONT_SIZE));
             fileBrowserJList.setVisibleRowCount(15);
-            fileBrowserJList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+            //fileBrowserJList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+            fileBrowserJList.setSelectionMode(ListSelectionModel.MULTIPLE_INTERVAL_SELECTION);
             fileBrowserJList.addListSelectionListener(selectionListener);
             fileBrowserJList.addMouseListener(jListMouseListener);
 
@@ -4036,7 +4042,6 @@ INNER_BREAK:
                     iListId = SCREENSHOT_LIST;
                     PullScreenshotDialog();
                 }
-                
 			}
 			else if ( PULL_SCREENSHOT_SUBMIT.equals(sActionCommand) )
 			{
@@ -4064,56 +4069,82 @@ INNER_BREAK:
                 }
 			    
 			    RefreshProperties();
-			    sb = new StringBuffer();
 			    
-                if ( iOS == LINUX_MAC )
-                {
-                    sb.append("export PATH=${PATH}:");
-                    sb.append(androidSdkPathS);
-                    sb.append("/platform-tools");
-                    sb.append(";adb ");
-                }
-                else
-                {
-                    sb.append("SET PATH=");
-                    sb.append(androidSdkPathS);
-                    sb.append("/platform-tools");
-                    sb.append(";%PATH%");
-                    sb.append("&&adb ");
-                }
-
-                if ( (sDeviceName != null) && (sDeviceName.length() > 0) )
-                {
-                    sb.append("-s ");
-                    sb.append(sDeviceName);
-                    sb.append(" ");
-                }
-/**/
 			    
-                sb.append("pull ");
-                if ( (sScreenshotDir != null) && (sScreenshotDir.length() > 0) )
-                    sb.append(sScreenshotDir);
-                
-                sb.append("/");
-                if ( (sListSelection != null) && (sListSelection.length() > 0) )
-                    sb.append(sListSelection);
-                
-                sb.append(" ");
-                if ( (sDownloadDir != null) && (sDownloadDir.length() > 0) )
+                if ( (selectionList != null) && (selectionList.size() > 0) )
                 {
-                    sb.append((char)0x22);
-                    sb.append(sDownloadDir);
-                    sb.append((char)0x22);
+                    for ( int iSelIndex = 0; iSelIndex < selectionList.size(); iSelIndex++ )
+                    {
+                        //System.out.println("--TOP--  iSelIndex: "+iSelIndex);
+                        sListSelection = selectionList.get(iSelIndex);
+                        //System.out.println("sListSelection: '"+sListSelection+"'");
+			    
+                        sb = new StringBuffer();
+                        
+                        if ( iOS == LINUX_MAC )
+                        {
+                            sb.append("export PATH=${PATH}:");
+                            sb.append(androidSdkPathS);
+                            sb.append("/platform-tools");
+                            sb.append(";adb ");
+                        }
+                        else
+                        {
+                            sb.append("SET PATH=");
+                            sb.append(androidSdkPathS);
+                            sb.append("/platform-tools");
+                            sb.append(";%PATH%");
+                            sb.append("&&adb ");
+                        }
+        
+                        if ( (sDeviceName != null) && (sDeviceName.length() > 0) )
+                        {
+                            sb.append("-s ");
+                            sb.append(sDeviceName);
+                            sb.append(" ");
+                        }
+                        
+                        sb.append("pull ");
+                        if ( (sScreenshotDir != null) && (sScreenshotDir.length() > 0) )
+                            sb.append(sScreenshotDir);
+                        
+                        sb.append("/");
+                        if ( (sListSelection != null) && (sListSelection.length() > 0) )
+                            sb.append(sListSelection);
+                        
+                        sb.append(" ");
+                        if ( (sDownloadDir != null) && (sDownloadDir.length() > 0) )
+                        {
+                            sb.append((char)0x22);
+                            sb.append(sDownloadDir);
+                            sb.append((char)0x22);
+                        }
+        
+                        if ( iOS == WINDOWS )
+                            sb.append("\n");
+        
+                        // Set up for IOBgThread output..
+                        commandS = sb.toString();
+                        
+                        bIOBgThreadFinished = false;
+                        iOBgThread = new IOBgThread();
+                        iOBgThread.start();
+                        
+                        while ( true )
+                        {
+                            try
+                            {
+                                Thread.sleep(150);
+                            }
+                            catch (InterruptedException ie)
+                            {
+                            }
+                            
+                            if ( bIOBgThreadFinished )
+                                break;
+                        }
+                    }   // End for..
                 }
-
-                if ( iOS == WINDOWS )
-                    sb.append("\n");
-
-                // Set up for IOBgThread output..
-                commandS = sb.toString();
-                
-                iOBgThread = new IOBgThread();
-                iOBgThread.start();
                 
 				screenshotFrame.setVisible(false);
 				screenshotFrame.dispose();
@@ -4529,6 +4560,7 @@ INNER_BREAK:
 			        return;
 			    
 			    RefreshProperties();
+			    
 			    sb = new StringBuffer();
 			    
                 if ( iOS == LINUX_MAC )
@@ -4604,7 +4636,6 @@ INNER_BREAK:
                     iListId = CAMERA_IMAGE_LIST;
                     PullCameraImageDialog();
                 }
-                
 			}
 			else if ( PULL_CAMERA_IMAGE_SUBMIT.equals(sActionCommand) )
 			{
@@ -4632,56 +4663,87 @@ INNER_BREAK:
                 }
 			    
 			    RefreshProperties();
-			    sb = new StringBuffer();
-			    
-                if ( iOS == LINUX_MAC )
-                {
-                    sb.append("export PATH=${PATH}:");
-                    sb.append(androidSdkPathS);
-                    sb.append("/platform-tools");
-                    sb.append(";adb ");
-                }
-                else
-                {
-                    sb.append("SET PATH=");
-                    sb.append(androidSdkPathS);
-                    sb.append("/platform-tools");
-                    sb.append(";%PATH%");
-                    sb.append("&&adb ");
-                }
-
-                if ( (sDeviceName != null) && (sDeviceName.length() > 0) )
-                {
-                    sb.append("-s ");
-                    sb.append(sDeviceName);
-                    sb.append(" ");
-                }
+/*			    
+			    if ( selectionList == null )
+			        System.out.println("selectionList null");
+			    else
+			        System.out.println("selectionList.size(): "+selectionList.size());
 /**/
-			    
-                sb.append("pull ");
-                if ( (sCameraDir != null) && (sCameraDir.length() > 0) )
-                    sb.append(sCameraDir);
-                
-                sb.append("/");
-                if ( (sListSelection != null) && (sListSelection.length() > 0) )
-                    sb.append(sListSelection);
-                
-                sb.append(" ");
-                if ( (sDownloadDir != null) && (sDownloadDir.length() > 0) )
+
+                if ( (selectionList != null) && (selectionList.size() > 0) )
                 {
-                    sb.append((char)0x22);
-                    sb.append(sDownloadDir);
-                    sb.append((char)0x22);
+                    for ( int iSelIndex = 0; iSelIndex < selectionList.size(); iSelIndex++ )
+                    {
+                        //System.out.println("--TOP--  iSelIndex: "+iSelIndex);
+                        sListSelection = selectionList.get(iSelIndex);
+                        //System.out.println("sListSelection: '"+sListSelection+"'");
+			    
+                        sb = new StringBuffer();
+                        
+                        if ( iOS == LINUX_MAC )
+                        {
+                            sb.append("export PATH=${PATH}:");
+                            sb.append(androidSdkPathS);
+                            sb.append("/platform-tools");
+                            sb.append(";adb ");
+                        }
+                        else
+                        {
+                            sb.append("SET PATH=");
+                            sb.append(androidSdkPathS);
+                            sb.append("/platform-tools");
+                            sb.append(";%PATH%");
+                            sb.append("&&adb ");
+                        }
+        
+                        if ( (sDeviceName != null) && (sDeviceName.length() > 0) )
+                        {
+                            sb.append("-s ");
+                            sb.append(sDeviceName);
+                            sb.append(" ");
+                        }
+                        
+                        sb.append("pull ");
+                        if ( (sCameraDir != null) && (sCameraDir.length() > 0) )
+                            sb.append(sCameraDir);
+                        
+                        sb.append("/");
+                        if ( (sListSelection != null) && (sListSelection.length() > 0) )
+                            sb.append(sListSelection);
+                        
+                        sb.append(" ");
+                        if ( (sDownloadDir != null) && (sDownloadDir.length() > 0) )
+                        {
+                            sb.append((char)0x22);
+                            sb.append(sDownloadDir);
+                            sb.append((char)0x22);
+                        }
+        
+                        if ( iOS == WINDOWS )
+                            sb.append("\n");
+        
+                        // Set up for IOBgThread output..
+                        commandS = sb.toString();
+
+                        bIOBgThreadFinished = false;                        
+                        iOBgThread = new IOBgThread();
+                        iOBgThread.start();
+                        
+                        while ( true )
+                        {
+                            try
+                            {
+                                Thread.sleep(150);
+                            }
+                            catch (InterruptedException ie)
+                            {
+                            }
+                            
+                            if ( bIOBgThreadFinished )
+                                break;
+                        }
+                    }   // End for..
                 }
-
-                if ( iOS == WINDOWS )
-                    sb.append("\n");
-
-                // Set up for IOBgThread output..
-                commandS = sb.toString();
-                
-                iOBgThread = new IOBgThread();
-                iOBgThread.start();
                 
 
 				cameraFrame.setVisible(false);
@@ -5424,7 +5486,7 @@ INNER_BREAK:
 			    sSelectedMenu = "Pull file";
 			    
                 // Open Dialog..
-                FileBrowserDialog("File to pull");
+                FileBrowserDialog("Files to pull");
 					
 			}
 			else if ( DELETE_FILE.equals(sActionCommand) )
@@ -5437,7 +5499,7 @@ INNER_BREAK:
 			    sSelectedMenu = "Delete file";
 			    
                 // Open Dialog..
-                FileBrowserDialog("File to delete");
+                FileBrowserDialog("Files to delete");
 					
 			}
 			else if ( SELECT_FILE_GO.equals(sActionCommand) )
@@ -5446,8 +5508,18 @@ INNER_BREAK:
 			    
 			    //System.out.println("sCurrentPath: '"+sCurrentPath+"'");
 			    JButton pathButton;
+/*
+                if ( selectionList == null )
+                    System.out.println("selectionList null");
+                else
+                    System.out.println("selectionList.size(): "+selectionList.size());
+/**/
 			    
-/*			    
+                if ( (selectionList != null) && (selectionList.size() > 0) )
+                {
+                    sListSelection = selectionList.get(0);
+                }
+/*
                 if ( sListSelection == null )
                     System.out.println("sListSelection null");
                 else
@@ -5483,189 +5555,216 @@ INNER_BREAK:
                     fileBrowserFrame.setVisible(false);
                     fileBrowserFrame.dispose();
                 }
-
-                sb = new StringBuffer();
                 
-                if ( iOS == LINUX_MAC )
+                if ( (selectionList != null) && (selectionList.size() > 0) )
                 {
-                    sb.append("export PATH=${PATH}:");
-                    sb.append(androidSdkPathS);
-                    sb.append("/platform-tools");
-                    sb.append(";adb ");
-                }
-                else
-                {
-                    sb.append("SET PATH=");
-                    sb.append(androidSdkPathS);
-                    sb.append("/platform-tools");
-                    sb.append(";%PATH%");
-                    sb.append("&&adb ");
-                }
-
-                if ( (sDeviceName != null) && (sDeviceName.length() > 0) )
-                {
-                    sb.append("-s ");
-                    sb.append(sDeviceName);
-                    sb.append(" ");
-                }
-
-/*                
-                if ( sSelectedMenu == null )
-                    System.out.println("sSelectedMenu null");
-                else
-                    System.out.println("sSelectedMenu: '"+sSelectedMenu+"'");
-/**/                
-                
-                if ( (sSelectedMenu != null) && (sSelectedMenu.length() > 0) )
-                {
-                    if ( sSelectedMenu.equals("Push file") )
+                    for ( int iSelIndex = 0; iSelIndex < selectionList.size(); iSelIndex++ )
                     {
-                        //   adb push c:/users/administrator/downloads/ep042019_5day_005.zip /sdcard/ep042019_5day_005.zip
-                        sb.append("push ");
+                        //System.out.println("--TOP--  iSelIndex: "+iSelIndex);
+                        sListSelection = selectionList.get(iSelIndex);
+                        //System.out.println("sListSelection: '"+sListSelection+"'");
+
+                        sb = new StringBuffer();
                         
-                        SingletonClass sc = SingletonClass.getInstance();
-                        sSelectedFile = sc.sSelectedFile;
-/*                        
-                        if ( sSelectedFile == null )
-                            System.out.println("(sc)sSelectedFile null");
-                        else
-                            System.out.println("(sc)sSelectedFile: '"+sSelectedFile+"'");
-/**/                        
-                        
-/*                        
-                        if ( sCurrentPath == null )
-                            System.out.println("sCurrentPath null");
-                        else
-                            System.out.println("sCurrentPath: '"+sCurrentPath+"'");
-/**/                        
-/*                        
-                        if ( sListSelection == null )
-                            System.out.println("sListSelection null");
-                        else
-                            System.out.println("sListSelection: '"+sListSelection+"'");
-/**/
-                        if ( (sSelectedFile != null) && (sSelectedFile.length() > 0) )
+                        if ( iOS == LINUX_MAC )
                         {
-                            // Source..
-                            sB = new StringBuffer();
-                            sB.append('"');
-                            sSelectedFile = processPath(sSelectedFile);     // Flip slashes..
-                            sB.append(sSelectedFile);
-                            
-                            sB.append('"');
-                            
-                            sb.append(sB.toString());
-                            sb.append(" ");
-
-                            // Destination.. 
-                            sB = new StringBuffer();
-                            if ( (sCurrentPath != null) && (sCurrentPath.length() > 0) )
-                            {
-                                sB.append(sCurrentPath);
-                                sB.append("/");
-                            }
-
-                            if ( (sListSelection != null) && (sListSelection.length() > 0) )
-                            {
-                                if ( sListSelection.startsWith("[") )
-                                    sListSelection = sListSelection.substring(1, sListSelection.length() - 1);
+                            sb.append("export PATH=${PATH}:");
+                            sb.append(androidSdkPathS);
+                            sb.append("/platform-tools");
+                            sb.append(";adb ");
+                        }
+                        else
+                        {
+                            sb.append("SET PATH=");
+                            sb.append(androidSdkPathS);
+                            sb.append("/platform-tools");
+                            sb.append(";%PATH%");
+                            sb.append("&&adb ");
+                        }
         
-                                //System.out.println("(Final)sListSelection: '"+sListSelection+"'");
-                                    
-                                sB.append(sListSelection);
-                            }
-                            //System.out.println("sB: '"+sB.toString()+"'");
-                            
-                            sb.append(sB.toString());
-                            
+                        if ( (sDeviceName != null) && (sDeviceName.length() > 0) )
+                        {
+                            sb.append("-s ");
+                            sb.append(sDeviceName);
+                            sb.append(" ");
                         }
-                        
-                    }
-                    else if ( sSelectedMenu.equals("Pull file") )
-                    {
-                        // adb pull /sdcard/ep042019_5day_005.zip "C:/Users/Joe Siebenmann/Downloads/ep042019_5day_005.zip"
-                        sb.append("pull ");
-                        
-                        // Source dir..
-/*                        
-                        if ( sListSelection == null )
-                            System.out.println("sListSelection null");
+        
+/*                
+                        if ( sSelectedMenu == null )
+                            System.out.println("sSelectedMenu null");
                         else
-                            System.out.println("sListSelection: '"+sListSelection+"'");
+                            System.out.println("sSelectedMenu: '"+sSelectedMenu+"'");
+/**/                
+                        
+                        if ( (sSelectedMenu != null) && (sSelectedMenu.length() > 0) )
+                        {
+                            if ( sSelectedMenu.equals("Push file") )
+                            {
+                                //   adb push c:/users/administrator/downloads/ep042019_5day_005.zip /sdcard/ep042019_5day_005.zip
+                                sb.append("push ");
+                                
+                                SingletonClass sc = SingletonClass.getInstance();
+                                sSelectedFile = sc.sSelectedFile;
+/*                        
+                                if ( sSelectedFile == null )
+                                    System.out.println("(sc)sSelectedFile null");
+                                else
+                                    System.out.println("(sc)sSelectedFile: '"+sSelectedFile+"'");
+/**/                        
+                                
+/*                        
+                                if ( sCurrentPath == null )
+                                    System.out.println("sCurrentPath null");
+                                else
+                                    System.out.println("sCurrentPath: '"+sCurrentPath+"'");
 /**/                        
 /*                        
-                        if ( sCurrentPath == null )
-                            System.out.println("sCurrentPath null");
-                        else
-                            System.out.println("sCurrentPath: '"+sCurrentPath+"'");
+                                if ( sListSelection == null )
+                                    System.out.println("sListSelection null");
+                                else
+                                    System.out.println("sListSelection: '"+sListSelection+"'");
 /**/
-                        if ( (sCurrentPath != null) && (sCurrentPath.length() > 0)
-                            && (sListSelection != null) && (sListSelection.length() > 0) )
-                        {
-
-                            sB = new StringBuffer();
-                            sB.append(sCurrentPath);    // Like: '/dev/block'
-                            sB.append("/");
-                            
-                            //System.out.println("(Final)sListSelection: '"+sListSelection+"'");
-
-                            // Like:  'mmcblk0p25'
-                            sB.append(sListSelection);
-                            //System.out.println("sB: '"+sB.toString()+"'");
-                            
-                            sb.append(sB.toString());
-                        }
-/*                        
-                        if ( sListSelection == null )
-                            System.out.println("sListSelection null");
-                        else
-                            System.out.println("sListSelection: '"+sListSelection+"'");
+                                if ( (sSelectedFile != null) && (sSelectedFile.length() > 0) )
+                                {
+                                    // Source..
+                                    sB = new StringBuffer();
+                                    sB.append('"');
+                                    sSelectedFile = processPath(sSelectedFile);     // Flip slashes..
+                                    sB.append(sSelectedFile);
+                                    
+                                    sB.append('"');
+                                    
+                                    sb.append(sB.toString());
+                                    sb.append(" ");
+        
+                                    // Destination.. 
+                                    sB = new StringBuffer();
+                                    if ( (sCurrentPath != null) && (sCurrentPath.length() > 0) )
+                                    {
+                                        sB.append(sCurrentPath);
+                                        sB.append("/");
+                                    }
+        
+                                    if ( (sListSelection != null) && (sListSelection.length() > 0) )
+                                    {
+                                        if ( sListSelection.startsWith("[") )
+                                            sListSelection = sListSelection.substring(1, sListSelection.length() - 1);
+                
+                                        //System.out.println("(Final)sListSelection: '"+sListSelection+"'");
+                                            
+                                        sB.append(sListSelection);
+                                    }
+                                    //System.out.println("sB: '"+sB.toString()+"'");
+                                    
+                                    sb.append(sB.toString());
+                                }
+                            }
+                            else if ( sSelectedMenu.equals("Pull file") )
+                            {
+                                //System.out.println("Pull file");
+                                // adb pull /sdcard/ep042019_5day_005.zip "C:/Users/Joe Siebenmann/Downloads/ep042019_5day_005.zip"
+                                sb.append("pull ");
+                                
+                                // Source dir..
+/*                                
+                                if ( sListSelection == null )
+                                    System.out.println("sListSelection null");
+                                else
+                                    System.out.println("sListSelection: '"+sListSelection+"'");
 /**/ 
-
-                        // Destination path..
-                        if ( (sDownloadDir != null) && (sDownloadDir.length() > 0) )
-                        {
-                            sb.append(" ");
-                            sb.append('"');
-                            sb.append(sDownloadDir);
-                            sb.append('"');
-                            sb.append(" ");
+/*        
+                                if ( sCurrentPath == null )
+                                    System.out.println("sCurrentPath null");
+                                else
+                                    System.out.println("sCurrentPath: '"+sCurrentPath+"'");
+/**/
+                                if ( (sCurrentPath != null) && (sCurrentPath.length() > 0)
+                                    && (sListSelection != null) && (sListSelection.length() > 0) )
+                                {
+        
+                                    sB = new StringBuffer();
+                                    sB.append(sCurrentPath);    // Like: '/dev/block'
+                                    sB.append("/");
+                                    
+                                    //System.out.println("(Final)sListSelection: '"+sListSelection+"'");
+        
+                                    // Like:  'mmcblk0p25'
+                                    sB.append(sListSelection);
+                                    //System.out.println("sB: '"+sB.toString()+"'");
+                                    
+                                    sb.append(sB.toString());
+                                }
+/*                        
+                                if ( sListSelection == null )
+                                    System.out.println("sListSelection null");
+                                else
+                                    System.out.println("sListSelection: '"+sListSelection+"'");
+/**/ 
+        
+                                // Destination path..
+                                if ( (sDownloadDir != null) && (sDownloadDir.length() > 0) )
+                                {
+                                    sb.append(" ");
+                                    sb.append('"');
+                                    sb.append(sDownloadDir);
+                                    sb.append('"');
+                                    sb.append(" ");
+                                }
+                            }
+                            else if ( sSelectedMenu.equals("Delete file") )
+                            {
+                                sb.append("shell rm ");
+                                
+                                if ( (sCurrentPath != null) && (sCurrentPath.length() > 0)
+                                    && (sListSelection != null) && (sListSelection.length() > 0) )
+                                {
+        
+                                    sB = new StringBuffer();
+                                    sB.append(sCurrentPath);    // Like: '/dev/block'
+                                    sB.append("/");
+                                    
+                                    //System.out.println("(Final)sListSelection: '"+sListSelection+"'");
+        
+                                    // Like:  'mmcblk0p25'
+                                    sB.append(sListSelection);
+                                    //System.out.println("sB: '"+sB.toString()+"'");
+                                    
+                                    sb.append(sB.toString());
+                                }
+                            }
                         }
-                    }
-                    else if ( sSelectedMenu.equals("Delete file") )
-                    {
-                        sb.append("shell rm ");
                         
-                        if ( (sCurrentPath != null) && (sCurrentPath.length() > 0)
-                            && (sListSelection != null) && (sListSelection.length() > 0) )
+                        if ( iOS == WINDOWS )
+                            sb.append("\n");
+                        
+                        //System.out.println("(Push/Pull command)sb: '"+sb.toString()+"'");
+                        
+                        // Set up for IOBgThread output..
+                        commandS = sb.toString();
+        
+                        bIOBgThreadFinished = false;                
+                        iOBgThread = new IOBgThread();
+                        iOBgThread.start();
+        
+                        while ( true )
                         {
-
-                            sB = new StringBuffer();
-                            sB.append(sCurrentPath);    // Like: '/dev/block'
-                            sB.append("/");
+                            try
+                            {
+                                Thread.sleep(150);
+                            }
+                            catch (InterruptedException ie)
+                            {
+                            }
                             
-                            //System.out.println("(Final)sListSelection: '"+sListSelection+"'");
-
-                            // Like:  'mmcblk0p25'
-                            sB.append(sListSelection);
-                            //System.out.println("sB: '"+sB.toString()+"'");
-                            
-                            sb.append(sB.toString());
+                            if ( bIOBgThreadFinished )
+                                break;
                         }
-                    }
+                        
+                        if ( sSelectedMenu.equals("Push file") )
+                            break;
+                        
+                    }   // End for..
                 }
-                
-                if ( iOS == WINDOWS )
-                    sb.append("\n");
-                
-                //System.out.println("(Push/Pull command)sb: '"+sb.toString()+"'");
-                
-                // Set up for IOBgThread output..
-                commandS = sb.toString();
-                
-                iOBgThread = new IOBgThread();
-                iOBgThread.start();
-                
 			}
 			else if ( PUSH_FILE.equals(sActionCommand) )
 			{
@@ -5899,24 +5998,33 @@ INNER_BREAK:
 	{
 		public void valueChanged(ListSelectionEvent e)
 		{
-			//System.out.println("\nListSelectionListener valueChanged()");
+			//("\nListSelectionListener valueChanged()");
 			//System.out.println("e.toString(): "+e.toString());
 			int iFirstIndex = e.getFirstIndex();
+			int[] iSelAr;
 			long lTime;
 			boolean bDoGo = false;
 			StringBuffer sB;
 			String sT = "";
+			//List<String> selList = new ArrayList<String>();
+			selectionList = new ArrayList<String>();
 			//System.out.println("iFirstIndex: "+iFirstIndex);
 			
 			if ( iListId == SCREENSHOT_LIST )
 			{
 			    if ( screenshotFilesJList != null )
-			        sListSelection = (String)screenshotFilesJList.getSelectedValue();
+			    {
+			        //sListSelection = (String)screenshotFilesJList.getSelectedValue();
+			        selectionList = screenshotFilesJList.getSelectedValuesList();
+			    }
 			}
 			else if ( iListId == CAMERA_IMAGE_LIST )
 			{
 			    if ( cameraImagesJList != null )
-			        sListSelection = (String)cameraImagesJList.getSelectedValue();
+			    {
+			        //sListSelection = (String)cameraImagesJList.getSelectedValue();
+			        selectionList = cameraImagesJList.getSelectedValuesList();
+			    }
 			}
 			else if ( iListId == PACKAGE_LIST )
 			{
@@ -5927,7 +6035,35 @@ INNER_BREAK:
 			{
 			    //System.out.println("FILE_BROWSER_LIST");
 			    if ( fileBrowserJList != null )
-			        sListSelection = (String)fileBrowserJList.getSelectedValue();
+			    {
+			        //sListSelection = (String)fileBrowserJList.getSelectedValue();
+			        
+			        selectionList = fileBrowserJList.getSelectedValuesList();
+/*
+                    if ( selectionList == null )
+                        System.out.println("selectionList null");
+                    else
+                        System.out.println("selectionList.size(): "+selectionList.size());
+/**/
+
+/*			        
+			        if ((selectionList != null) && (selectionList.size() > 0))
+			        {
+			            for ( int iJ = 0; iJ < selectionList.size(); iJ++ )
+			                System.out.println("selectionList ["+iJ+"]: '"+selectionList.get(iJ)+"'");
+			        }
+/**/			        
+			        
+/*			        
+			        iSelAr = fileBrowserJList.getSelectedIndices();
+			        if ((iSelAr != null) && (iSelAr.length > 0))
+			        {
+			            for ( int iJ = 0; iJ < iSelAr.length; iJ++ )
+			                System.out.println("iSelAr["+iJ+"]: "+iSelAr[iJ]);
+			            
+			        }
+/**/			        
+			    }
 			}
 		}
 	}; //}}}

@@ -69,8 +69,10 @@ Release notes:
         Tried to improve the Process Id logcat output.
         Option to show selected package, for logcat, in Status Bar.
 
+    ADB_Util 1.1.6:
+        Many 'File' and 'Camera' operations now support selecting
+        multiple files.
         
-   Please let me know of any problems you find or features to add.
    
    joes0451@outlook.com
         
