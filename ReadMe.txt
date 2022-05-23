@@ -14,9 +14,9 @@ ADB_Util
     so you have to wait till it re-connects and do "Home->Select Device".
     
 Logcat:
-    For Logcat can choose to just view log output from the running Process Id,
+    For Logcat you can choose to just view log output from the running Process Id,
 	there can be a delay before it starts sending output.
-    Normally with logcat you can let it run until it slows down, and
+    Normally with logcat you let it run until it slows down, and
     then you can start your Process.
 
     You can edit the "logcat_filter" property in config.properties which will
@@ -59,9 +59,6 @@ Wireless:
 
 
 Release notes:
-
-    ADB_Util 1.1.3:
-        Tried to improve the Process Id logcat.
         
     ADB_Util 1.1.4:
         Added "Home->Devices" to show current devices,
@@ -73,6 +70,10 @@ Release notes:
         Many 'File' and 'Camera' operations now support selecting
         multiple files.
         
-   
+    ADB_Util 1.1.7:
+        For 'Apk->Uninstall..' it will now wake up the device, if it's asleep,
+        so that the uninstall will work.
+    
+    
    joes0451@outlook.com
         

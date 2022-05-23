@@ -178,6 +178,7 @@ public class ADB_Util
     static volatile String sScreenRecordVideoSize;
     static volatile String sScreenRecordShowVerbose;
     static volatile String sShowPackageNameInStatusBar;
+    static volatile String sWakefulness;
     
     static volatile String[] tokSa;
     
@@ -196,6 +197,8 @@ public class ADB_Util
     static volatile boolean bWirelessEnabled;
     static volatile boolean bUpdateFileBrowserFinished;
     static volatile boolean bShellPsFinished;
+    static volatile boolean bWakeDeviceFinished;
+    static volatile boolean bCheckDeviceFinished;
     
     static volatile int iOS;
     static volatile int iListId;
@@ -234,6 +237,8 @@ public class ADB_Util
     ConnectWirelessBgThread connectWirelessBgThread;
     DisconnectWirelessBgThread disconnectWirelessBgThread;
     UpdateFileBrowserBgThread updateFileBrowserBgThread;
+    CheckDeviceBgThread checkDeviceBgThread;
+    WakeDeviceBgThread wakeDeviceBgThread;
     
 	static final int WINDOWS = 0;
 	static final int LINUX_MAC = 1;
@@ -2822,6 +2827,165 @@ INNER_BREAK:
 		}
 	}	//}}}
 
+	//{{{	CheckDeviceBgThread
+	class CheckDeviceBgThread extends Thread
+	{
+		public void run()
+		{
+			//System.out.println("\nCheckDeviceBgThread run()");
+			StringBuffer sb = new StringBuffer();
+			int iStart = 0;
+			int iLoc2 = 0;
+			String sT = "";
+			sWakefulness = "";
+			
+			sb = new StringBuffer();		
+			if ( iOS == LINUX_MAC )
+			{
+				sb.append("export PATH=${PATH}:");
+				sb.append(androidSdkPathS);
+				sb.append("/platform-tools");
+				sb.append(";adb ");
+			}
+			else
+			{
+				sb.append("SET PATH=");
+				sb.append(androidSdkPathS);
+				sb.append("/platform-tools");
+				sb.append(";%PATH%");
+
+				sb.append("&&adb ");
+			}
+
+            if ( (sDeviceName != null) && (sDeviceName.length() > 0) )
+            {
+                sb.append("-s ");
+                sb.append(sDeviceName);
+                sb.append(" ");
+            }
+
+            sb.append("shell dumpsys power");
+            
+            if ( iOS == WINDOWS )
+                sb.append("\n");
+            
+			//System.out.println("sb: '"+sb.toString()+"'");
+			
+			bCommandFinished = false;		
+			sInternalCommand = sb.toString();
+			commandBgThread = new CommandBgThread();
+			commandBgThread.start();
+	
+			// Wait for Thread to finish..
+			while ( true )
+			{
+				try
+				{
+					Thread.sleep(150);
+				}
+				catch (InterruptedException ie)
+				{
+				}
+
+				if ( bCommandFinished )
+					break;
+			}
+			
+            // mWakefulness=Asleep
+			// mWakefulness=Awake
+
+            if ( (commandResultS != null) && (commandResultS.length() > 0) )
+            {
+                iLoc2 = commandResultS.indexOf("mWakefulness=");
+                iStart = iLoc2;
+                if ( iLoc2 != -1 )
+                {
+                    char cCh;
+                    while ( true )
+                    {
+                        cCh = commandResultS.charAt(iLoc2);
+                        if ( cCh > 0x20 )
+                        {
+                            iLoc2++;
+                            continue;
+                        }
+                        else
+                            break;
+                    }
+                    
+                    sT = commandResultS.substring((iStart + 13), iLoc2);
+                    sT = sT.trim();
+                    sWakefulness = sT;
+                }
+            }
+            
+            bCheckDeviceFinished = true;
+		}
+	}    //}}}
+
+	//{{{	WakeDeviceBgThread
+	class WakeDeviceBgThread extends Thread
+	{
+		public void run()
+		{
+			//System.out.println("WakeDeviceBgThread run()");
+			StringBuffer internalSb = new StringBuffer();
+			
+			if ( iOS == LINUX_MAC )
+			{
+				internalSb.append("export PATH=${PATH}:");
+				internalSb.append(androidSdkPathS);
+				internalSb.append("/platform-tools");
+				
+				internalSb.append(";adb ");
+			}
+			else
+			{
+				internalSb.append("SET PATH=");
+				internalSb.append(androidSdkPathS);
+				internalSb.append("/platform-tools");
+				internalSb.append(";%PATH%");
+				
+				internalSb.append("&&adb ");
+			}
+			
+			if ( (sDeviceName != null) && (sDeviceName.length() > 0) )
+			{
+				internalSb.append("-s ");
+				internalSb.append(sDeviceName);
+				internalSb.append(" ");
+			}
+
+			//internalSb.append("shell input keyevent 26");    // KEYCODE_POWER
+			internalSb.append("shell input keyevent 224");    // KEYCODE_WAKEUP
+			
+            if ( iOS == WINDOWS )
+                internalSb.append("\n");
+			
+			bCommandFinished = false;		
+			sInternalCommand = internalSb.toString();
+			commandBgThread = new CommandBgThread();
+			commandBgThread.start();
+	
+			// Wait for Thread to finish..
+			while ( true )
+			{
+				try
+				{
+					Thread.sleep(150);
+				}
+				catch (InterruptedException ie)
+				{
+				}
+	
+				if ( bCommandFinished )
+					break;
+			}
+			
+			bWakeDeviceFinished = true;
+		}
+	}    //}}}
+
 	//{{{   FinishPath()   
 	void FinishPath()
 	{
@@ -4942,6 +5106,46 @@ INNER_BREAK:
 			else if ( PACKAGE_SUBMIT.equals(sActionCommand) )
 			{
 			    //System.out.println("PACKAGE_SUBMIT");
+
+                bCheckDeviceFinished = false;
+                checkDeviceBgThread = new CheckDeviceBgThread();
+                checkDeviceBgThread.start();
+                
+                while ( true )
+                {
+                    try
+                    {
+                        Thread.sleep(150);
+                    }
+                    catch (InterruptedException ie)
+                    {
+                    }
+    
+                    if ( bCheckDeviceFinished )
+                        break;
+                }
+
+                if ( (sWakefulness != null) && (sWakefulness.equals("Asleep")) )
+                {
+                    // Wake up device..
+                    bWakeDeviceFinished = false;
+                    wakeDeviceBgThread = new WakeDeviceBgThread();
+                    wakeDeviceBgThread.start();
+                    
+                    while ( true )
+                    {
+                        try
+                        {
+                            Thread.sleep(150);
+                        }
+                        catch (InterruptedException ie)
+                        {
+                        }
+        
+                        if ( bWakeDeviceFinished )
+                            break;
+                    }
+                }
 			    
 			    if ( (sListSelection != null) && (sListSelection.length() > 0) )
 			    {
