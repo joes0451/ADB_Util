@@ -14,18 +14,25 @@ ADB_Util
     so you have to wait till it re-connects and do "Home->Select Device".
     
 Logcat:
-    For Logcat you can choose to just view log output from the running Process Id,
-	there can be a delay before it starts sending output.
-    Normally with logcat you let it run until it slows down, and
-    then you can start your Process.
+    This lets you see all the logcat output.
 
     You can edit the "logcat_filter" property in config.properties which will
     help to block the output of the selected tags.
     
     All warning and error messages are color highlighted in the output.
     
-    You can choose 'Logcat->Select Package' to select a running process
-    for using Logcat with the Process Id.
+PID Logcat:
+    This lets you see just the log output from the running Process Id.
+    
+    To enable, go into config.properties and set 'use_pid_logcat' to "true".
+    
+    It needs the package name of the application for the Process Id, so you first need to
+    start the app and select 'Logcat->Select Package' and select the package name.
+    This saves it so it can later be matched when you start
+    logcat.
+    
+Refresh:
+    Refreshes any changes made to config.properties.
     
 File Browser:
     When selecting a directory, other than for Submit, you can either
@@ -60,19 +67,20 @@ Wireless:
 
 Release notes:
         
-    ADB_Util 1.1.4:
-        Added "Home->Devices" to show current devices,
-        useful for checking connection for wireless.
-        Tried to improve the Process Id logcat output.
-        Option to show selected package, for logcat, in Status Bar.
-
-    ADB_Util 1.1.6:
-        Many 'File' and 'Camera' operations now support selecting
-        multiple files.
-        
     ADB_Util 1.1.7:
         For 'Apk->Uninstall..' it will now wake up the device, if it's asleep,
         so that the uninstall will work.
+
+    ADB_Util 1.1.9:
+        Improved logcat.  It now clears the logcat buffer each time it starts to 
+        reduce any slowdowns caused by long previous outputs.
+        Improved PID logcat.  The secound time you would run it,
+        it wouldn't get any output, and fixed it.
+    
+    ADB_Util 1.2.0:
+        Improved logcat.  Now uses 'brief' option for more compact output and
+        allow highlighting to work on newer devices.
+    
     
     
    joes0451@outlook.com

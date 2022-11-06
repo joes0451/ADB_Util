@@ -278,6 +278,7 @@ public class ADB_Util
 	static final String DELETE_FILE = "Delete files";
 	static final String WIRELESS_CONNECT = "wireless_connect";
 	static final String WIRELESS_DISCONNECT = "wireless_disconnect";
+	static final String REFRESH = "Refresh";
 	static final String LOGCAT = "Start/Stop Logcat";
 	static final String PULL_CAMERA_IMAGE = "Pull camera images";
 	static final String SELECT_PACKAGE = "Select Package";
@@ -455,6 +456,9 @@ public class ADB_Util
 		wirelessSubMenuItem.addActionListener(actListener);
 		wirelessSubMenu.add(wirelessSubMenuItem);
 		
+		JMenuItem refreshMenuItem = new JMenuItem("Refresh");
+		refreshMenuItem.addActionListener(actListener);
+		
 		JMenu screenshotMenu = new JMenu("Screen Capture/Camera");
 		JMenuItem takeScreenshotMenuItem = new JMenuItem("Take screenshot");
 		takeScreenshotMenuItem.addActionListener(actListener);
@@ -504,6 +508,7 @@ public class ADB_Util
 		homeMenu.add(selectDeviceMenuItem);
 		homeMenu.add(devicesMenuItem);
 		homeMenu.add(wirelessSubMenu);
+		homeMenu.add(refreshMenuItem);
 		menuBar.add(homeMenu);
 		
 		screenshotMenu.add(takeScreenshotMenuItem);
@@ -807,7 +812,12 @@ public class ADB_Util
 			
             SingletonClass sc = SingletonClass.getInstance();
             sPackageName = sc.sPackageName;
-
+/*            
+            if ( sPackageName == null )
+                System.out.println("sPackageName null");
+            else
+                System.out.println("sPackageName: '"+sPackageName+"'");
+/**/
 
 			// Note:
 			//
@@ -1007,7 +1017,8 @@ public class ADB_Util
                         // Without this, console output
                         // can get really laggy and unresponsive..
                         if ( lineSb.length() < 4096 )
-                            Thread.sleep(10);
+                            //Thread.sleep(10);
+                            Thread.sleep(7);
                         else
                         {
                             if ( lDif > 0 )
@@ -1025,15 +1036,24 @@ public class ADB_Util
 						//System.out.println("=== NEW BLOCK ===");
 						
 						//System.out.println("bLogcatOn: "+bLogcatOn);
+						//System.out.println("sUsePidLogcat: "+sUsePidLogcat);
                         if ( (bLogcatOn) && (sUsePidLogcat != null) && (sUsePidLogcat.length() > 0) )
                         {
                             if ( sUsePidLogcat.equals("true") )
                             {
+/*                                
+                                if ( sPid == null )
+                                    System.out.println("sPid null");
+                                else
+                                    System.out.println("sPid: '"+sPid+"'");
+/**/                                
+                                
                                 // Use PID Logcat..
-                                if ( (sPid != null) && (sPid.length() > 0) )
-                                    ;
+                                if ( (sPid != null) && (! sPid.equals("null")) && (sPid.length() > 0) )
+                                    ;   // Have PID..
                                 else
                                 {
+                                    // Don't have PID..
                                     sPid = "";
                                     StringBuffer sb = new StringBuffer();
                                     
@@ -1077,6 +1097,14 @@ public class ADB_Util
                                         if ( bCommandFinished )
                                             break;
                                     }
+                                    
+                                    //System.out.println("commandResultS: "+commandResultS);
+/*                                    
+                                    if ( sPackageName == null )
+                                        System.out.println("sPackageName null");
+                                    else
+                                        System.out.println("sPackageName: '"+sPackageName+"'");
+/**/
 
                                     if ( (sPackageName != null) && (! sPackageName.equals("null"))
                                         && (sPackageName.length() > 0) )
@@ -1095,6 +1123,7 @@ public class ADB_Util
                                             for ( ; ! Character.isWhitespace(commandResultS.charAt(iLoc3)); iLoc3++ );
                                             sPid = commandResultS.substring(iStart, iLoc3);
                                             //System.out.println("sPid: '"+sPid+"'");
+                                            
                                         }
                                     }
                                 }
@@ -1103,6 +1132,12 @@ public class ADB_Util
                                 
                                 iLoc3 = 0;
                                 bFirst2 = true;
+/*                                
+                                if ( sPid == null )
+                                    System.out.println("sPid null");
+                                else
+                                    System.out.println("sPid: '"+sPid+"'");
+/**/                                
 
                                 if ( (sPid != null) && (sPid.length() > 0) )
                                 {
@@ -4124,6 +4159,10 @@ INNER_BREAK:
                 }
 /**/                
 			}
+			else if ( REFRESH.equals(sActionCommand) )
+			{
+				RefreshProperties();
+			}
 			else if ( PULL_SCREENSHOT.equals(sActionCommand) )
 			{
 			    //System.out.println("PULL_SCREENSHOT");
@@ -4593,7 +4632,7 @@ INNER_BREAK:
             }
             else if ( SELECT_PACKAGE.equals(sActionCommand) )
             {
-                //System.out.println("SELECT_PACKAGE");
+                //System.out.println("\nSELECT_PACKAGE");
 			    SingletonClass sc = SingletonClass.getInstance();
 			    if ( sc.bConnected == false )
 			        return;
@@ -5105,7 +5144,7 @@ INNER_BREAK:
             }
 			else if ( PACKAGE_SUBMIT.equals(sActionCommand) )
 			{
-			    //System.out.println("PACKAGE_SUBMIT");
+			    //System.out.println("\nPACKAGE_SUBMIT");
 
                 bCheckDeviceFinished = false;
                 checkDeviceBgThread = new CheckDeviceBgThread();
@@ -5156,7 +5195,7 @@ INNER_BREAK:
 			            sListSelection = sListSelection.trim();
                         SingletonClass sc = SingletonClass.getInstance();
                         sc.sPackageName = sListSelection;
-			            //System.out.println("sc.sPackageName: '"+sc.sPackageName+"'");
+			            //System.out.println("\nsc.sPackageName: '"+sc.sPackageName+"'");
 
                         if ( (sShowPackageNameInStatusBar != null) && (sShowPackageNameInStatusBar.equals("true")) )
                         {
@@ -5343,11 +5382,11 @@ INNER_BREAK:
 			}
 			else if ( LOGCAT.equals(sActionCommand) )
 			{
-			    //System.out.println("LOGCAT");
+			    //System.out.println("\nLOGCAT");
 			    SingletonClass sc = SingletonClass.getInstance();
 			    if ( sc.bConnected == false )
 			        return;
-
+			    
                 //System.out.println("bLogcatOn: "+bLogcatOn);			    
 			    if ( bLogcatOn )
 			    {
@@ -5365,9 +5404,12 @@ INNER_BREAK:
                         {
                         }
                         
-                        if ( ! bLogcatOn )
+                        //if ( ! bLogcatOn )
+                        if ( bIOBgThreadFinished ) 
                             break;
                     }
+                    
+                    //System.out.println("Dropped out of IOBgThread");
                     
                     bLogcatOn = false;
 
@@ -5376,101 +5418,35 @@ INNER_BREAK:
 			    }
 			    else
 			    {
+			        // Logcat off..
+			        //System.out.println("\nStarting logcat");
                     RefreshProperties();
                     
-                    sb = new StringBuffer();
+                    // Clear current PID..
+                    sPid = "";
                     
+                    sb = new StringBuffer();
+
+                    // Clear buffer..                    
                     if ( iOS == LINUX_MAC )
                     {
                         sb.append("export PATH=${PATH}:");
                         sb.append(androidSdkPathS);
                         sb.append("/platform-tools");
-                        sb.append(";adb ");
-                    }
-                    else
-                    {
-                        sb.append("SET PATH=");
-                        sb.append(androidSdkPathS);
-                        sb.append("/platform-tools");
-                        sb.append(";%PATH%");
-                        sb.append("&&adb ");
-                    }
-
-                    if ( (sDeviceName != null) && (sDeviceName.length() > 0) )
-                    {
-                        sb.append("-s ");
-                        sb.append(sDeviceName);
-                        sb.append(" ");
-                    }
-/**/
-                    
-                    sb.append("shell ps");
                         
-                    if ( iOS == WINDOWS )
-                        sb.append("\n");
-                    
-                    //System.out.println("sb: '"+sb.toString()+"'");
-                    //commandRequestLatch = new CountDownLatch(1);
-                    bCommandFinished = false;
-                    sInternalCommand = sb.toString();
-                    commandBgThread = new CommandBgThread();
-                    commandBgThread.start();
-        
-                    // Wait for Thread to finish..
-                    while ( true )
-                    {
-                        try
-                        {
-                            Thread.sleep(250);
-                        }
-                        catch (InterruptedException ie)
-                        {
-                        }
-        
-                        if ( bCommandFinished )
-                            break;
-                    }
-                    
-                    sPackageName = sc.sPackageName;
-/*                    
-                    if ( sPackageName == null )
-                        System.out.println("sPackageName null");
-                    else
-                        System.out.println("sPackageName: '"+sPackageName+"'");
-/**/
-
-                    //System.out.println("commandResultS: '"+commandResultS+"'");
-                    
-                    
-
-                    if ( (sPackageName != null) && (! sPackageName.equals("null"))
-                        && (sPackageName.length() > 0) )
-                    {
-                        iLoc = commandResultS.indexOf(sPackageName);
-                        if ( iLoc != -1 )
-                        {
-                            // Grab PID..
-                            int iStart = 0;
-                            for ( ; commandResultS.charAt(iLoc) != (char)0x0a; iLoc-- );
-            
-                            iLoc++;
-                            for ( ; ! Character.isWhitespace(commandResultS.charAt(iLoc)); iLoc++ );
-                            for ( ; Character.isWhitespace(commandResultS.charAt(iLoc)); iLoc++ );
-                            iStart = iLoc;
-                            for ( ; ! Character.isWhitespace(commandResultS.charAt(iLoc)); iLoc++ );
-                            sPid = commandResultS.substring(iStart, iLoc);
-                            //System.out.println("sPid: '"+sPid+"'");
-                        }
-                    }
-                    
-                    sb = new StringBuffer();
-                    
-                    if ( iOS == LINUX_MAC )
-                    {
-                        sb.append("export PATH=${PATH}:");
-                        sb.append(androidSdkPathS);
-                        sb.append("/platform-tools");
                         sb.append(";adb ");
+                        
+                        if ( (sDeviceName != null) && (sDeviceName.length() > 0) )
+                        {
+                            sb.append("-s ");
+                            sb.append(sDeviceName);
+                            sb.append(" ");
+                        }
+                        
+                        //sb.append(";adb logcat -c");
+                        sb.append("logcat -c");
+                        sb.append(";");
+                        
                     }
                     else
                     {
@@ -5478,8 +5454,23 @@ INNER_BREAK:
                         sb.append(androidSdkPathS);
                         sb.append("/platform-tools");
                         sb.append(";%PATH%");
+                        
                         sb.append("&&adb ");
+                        
+                        if ( (sDeviceName != null) && (sDeviceName.length() > 0) )
+                        {
+                            sb.append("-s ");
+                            sb.append(sDeviceName);
+                            sb.append(" ");
+                        }
+                        
+                        //sb.append("&&adb logcat -c");
+                        sb.append("logcat -c");
+                        sb.append("&&");
+                        
                     }
+                    
+                    sb.append("adb ");
 
                     if ( (sDeviceName != null) && (sDeviceName.length() > 0) )
                     {
@@ -5487,8 +5478,15 @@ INNER_BREAK:
                         sb.append(sDeviceName);
                         sb.append(" ");
                     }
-/**/			    
+/**/
+
+					// Try to default to a more compact version..
+					// Also ensures that highlighting will work..
                     sb.append("logcat -v brief");
+                    
+                    //sb.append("logcat -c -v brief");
+                    //sb.append("logcat -c");
+                    //sb.append("logcat");
                     
 					if ( (logcatFilterS != null) && (! logcatFilterS.equals("")) )
 					{
@@ -5515,7 +5513,8 @@ INNER_BREAK:
 
                     // Turn on status message..                    
                     statusPath.setText("  Logcat on");
-                    
+
+                    bIOBgThreadFinished = false;                    
                     iOBgThread = new IOBgThread();
                     iOBgThread.start();
                 }
