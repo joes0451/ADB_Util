@@ -10,7 +10,7 @@ SilentInstall silent
 AutoCloseWindow true
 ShowInstDetails nevershow
  
-!define CLASSPATH ".;ADB_Util-1.2.0.jar"
+!define CLASSPATH ".;ADB_Util-1.2.2.jar"
 !define CLASS "com.dominionmobile.adbutil.ADB_Util"
 
 Section ""

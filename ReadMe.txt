@@ -4,7 +4,7 @@ ADB_Util
     or other uses.
 
     Go into config.properties and set 'android_sdk_path', 'download_dir',
-    'screenshot_dir' and 'camera_dir' to what works for your system or device.
+    'screenshot_dir' and 'camera_dir' to what works for your device.
     You can make changes to config.properties without needing to restart ADB_Util.
     
     For 'Apk->Install apk' you must have 'Unknown sources' turned on in Security.
@@ -12,6 +12,12 @@ ADB_Util
     ** Note **
     After you do "Reboot" or "Reboot to Recovery" it will lose any Device Id,
     so you have to wait till it re-connects and do "Home->Select Device".
+    
+    ** Note **
+    'sdcard' is just a symbolic link.  The actual path it uses for each device
+    can be different.  For Samsung it might be like '/storage/004E-A507', but it usually
+    starts with '/storage'.
+    You can use 'File->Pull fles' to navigate around and look at directories.
     
 Logcat:
     This lets you see all the logcat output.
@@ -31,7 +37,7 @@ PID Logcat:
     This saves it so it can later be matched when you start
     logcat.
     
-Refresh:
+Refresh Properties:
     Refreshes any changes made to config.properties.
     
 File Browser:
@@ -67,10 +73,6 @@ Wireless:
 
 Release notes:
         
-    ADB_Util 1.1.7:
-        For 'Apk->Uninstall..' it will now wake up the device, if it's asleep,
-        so that the uninstall will work.
-
     ADB_Util 1.1.9:
         Improved logcat.  It now clears the logcat buffer each time it starts to 
         reduce any slowdowns caused by long previous outputs.
@@ -81,7 +83,12 @@ Release notes:
         Improved logcat.  Now uses 'brief' option for more compact output and
         allow highlighting to work on newer devices.
     
-    
+    ADB_Util 1.2.2:
+        It will now figure out the paths for 'Camera' and 'Screenshots'.
+        Improved navigation.  If the file path ends with 'emulated' it will add '/0'
+        to prevent permission errors.
+        Improved File Dialog and operations.
+        Many other improvements.
     
    joes0451@outlook.com
         

@@ -5,7 +5,7 @@
 /**
  *	  ADB_Util is a utility for Android ADB
  *
- *	  Copyright (c) 2022 Joseph Siebenmann
+ *	  Copyright (c) 2023 Joseph Siebenmann
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the GNU General  Public License as published by
@@ -179,6 +179,9 @@ public class ADB_Util
     static volatile String sScreenRecordShowVerbose;
     static volatile String sShowPackageNameInStatusBar;
     static volatile String sWakefulness;
+    static volatile String sSDcardPath;
+    static volatile String sScreenshotPath;
+    static volatile String sCameraPath;
     
     static volatile String[] tokSa;
     
@@ -239,6 +242,7 @@ public class ADB_Util
     UpdateFileBrowserBgThread updateFileBrowserBgThread;
     CheckDeviceBgThread checkDeviceBgThread;
     WakeDeviceBgThread wakeDeviceBgThread;
+    FindSDcardBgThread findSDcardBgThread;
     
 	static final int WINDOWS = 0;
 	static final int LINUX_MAC = 1;
@@ -278,7 +282,7 @@ public class ADB_Util
 	static final String DELETE_FILE = "Delete files";
 	static final String WIRELESS_CONNECT = "wireless_connect";
 	static final String WIRELESS_DISCONNECT = "wireless_disconnect";
-	static final String REFRESH = "Refresh";
+	static final String REFRESH = "Refresh Properties";
 	static final String LOGCAT = "Start/Stop Logcat";
 	static final String PULL_CAMERA_IMAGE = "Pull camera images";
 	static final String SELECT_PACKAGE = "Select Package";
@@ -332,18 +336,26 @@ public class ADB_Util
          * Get number of running Emulators or devices..
          */
 
-		completeLatch = new CountDownLatch(1);
+		//completeLatch = new CountDownLatch(1);
 		
+		bDevicesFinished = false;
 		getDevicesBgThread = new GetDevicesBgThread();
 		getDevicesBgThread.start();
 
-		try
+		while ( true )
 		{
-			completeLatch.await();
-		}
-		catch (InterruptedException ie)
-		{
-		}
+            try
+            {
+                //completeLatch.await();
+                Thread.sleep(350);
+            }
+            catch (InterruptedException ie)
+            {
+            }
+            
+            if ( bDevicesFinished )
+                break;
+        }
 
 		if ( (DevicesAr	!= null) && (DevicesAr.size() > 0) )
 		{
@@ -361,6 +373,10 @@ public class ADB_Util
 				sDeviceName = (String)DevicesAr.get(0);
 			}
 		}
+		
+		findSDcardBgThread = new FindSDcardBgThread();
+		findSDcardBgThread.start();
+		
     }   //}}}
 
 	//{{{	RefreshProperties()
@@ -456,7 +472,7 @@ public class ADB_Util
 		wirelessSubMenuItem.addActionListener(actListener);
 		wirelessSubMenu.add(wirelessSubMenuItem);
 		
-		JMenuItem refreshMenuItem = new JMenuItem("Refresh");
+		JMenuItem refreshMenuItem = new JMenuItem("Refresh Properties");
 		refreshMenuItem.addActionListener(actListener);
 		
 		JMenu screenshotMenu = new JMenu("Screen Capture/Camera");
@@ -1903,6 +1919,7 @@ public class ADB_Util
                     // lrwxrwxrwx root     root              2021-07-17 10:48 bin -> /system/bin
                     // -rwxr-x--- root     root          160 1969-12-31 19:00 init.recovery.board.rc
                     // drwxrwx--x system   system            2014-12-31 20:51 productinfo
+                    
                     //System.out.println("\ntokSa.length: "+tokSa.length);
                     bHitlstat = false;
                     
@@ -1917,7 +1934,6 @@ BREAK_OUT:
                         {
                             bIsDir = false;
                             //System.out.println("["+iTokIndex+"]: '"+tokSa[iTokIndex]+"'");
-                            
                             if ( ((tokSa[iTokIndex].startsWith("d")) && (tokSa[iTokIndex].length() == 10)) ||
                                 ((tokSa[iTokIndex].startsWith("l")) && (tokSa[iTokIndex].length() == 10)) )
                             {
@@ -1930,13 +1946,21 @@ BREAK_OUT:
                             {
                                 iTokIndex++;
                                 //System.out.println("Found :");
-                                if ( tokSa[iTokIndex].contains(":") )
+                                if ( iTokIndex < tokSa.length )
+                                {
+                                    if ( tokSa[iTokIndex].contains(":") )
+                                        break;
+                                }
+                                else
                                     break;
                             }
                             
                             iTokIndex++;
-                            sNameSb.append(tokSa[iTokIndex]);
-                            sNameSb.append(" ");
+                            if ( iTokIndex < tokSa.length )
+                            {
+                                sNameSb.append(tokSa[iTokIndex]);
+                                sNameSb.append(" ");
+                            }
                             //System.out.println("(1)sNameSb: '"+sNameSb.toString()+"'");
                             
                             //      [java] drwxrwx--- root     sdcard_r          2020-02-27 16:39 Digital Editions
@@ -1946,12 +1970,15 @@ BREAK_OUT:
                             //System.out.println("bIsDir: "+bIsDir);
                             if ( bIsDir )
                             {
-                                tokSb = new StringBuffer();
-                                tokSb.append("[");
-                                tokSb.append(tokSa[iTokIndex]);
-                                tokSb.append("]");
-                                //System.out.println("(Add): '"+tokSb.toString()+"'");
-                                fileToksAr.add((String)tokSb.toString());
+                                if ( iTokIndex < tokSa.length )
+                                {
+                                    tokSb = new StringBuffer();
+                                    tokSb.append("[");
+                                    tokSb.append(tokSa[iTokIndex]);
+                                    tokSb.append("]");
+                                    //System.out.println("(Add): '"+tokSb.toString()+"'");
+                                    fileToksAr.add((String)tokSb.toString());
+                                }
                             }
                             
                             // 12:49 vendor -> /system/vendor   
@@ -1966,13 +1993,12 @@ INNER_BREAK:
                                 if ( (iTokIndex + 1) < tokSa.length )
                                 {
                                     iTokIndex++;
-                                    
                                     if ( tokSa[iTokIndex].startsWith("->") )
                                     {
                                         iTokIndex += 2;
                                         break;
                                     }
-                                        
+                                    
                                     if ( ((tokSa[iTokIndex].contains("-")) && (tokSa[iTokIndex].length() == 10)) ||
                                         ((tokSa[iTokIndex].startsWith("d")) && (tokSa[iTokIndex].length() == 10)) ||
                                         ((tokSa[iTokIndex].startsWith("l")) && (tokSa[iTokIndex].length() == 10)) ||
@@ -1994,7 +2020,6 @@ INNER_BREAK:
                                                 if ( (iTokIndex + 1) < tokSa.length )
                                                 {
                                                     iTokIndex++;
-                                                    
                                                     if ( ((tokSa[iTokIndex].contains("-")) && (tokSa[iTokIndex].length() == 10)) ||
                                                         ((tokSa[iTokIndex].startsWith("d")) && (tokSa[iTokIndex].length() == 10)) ||
                                                         ((tokSa[iTokIndex].startsWith("l")) && (tokSa[iTokIndex].length() == 10)) ||
@@ -2094,8 +2119,8 @@ INNER_BREAK:
 				sb.append(androidSdkPathS);
 				sb.append("/platform-tools");
 				
-				sb.append(";adb kill-server");
-				sb.append(";adb start-server");
+				//sb.append(";adb kill-server");
+				//sb.append(";adb start-server");
 				sb.append(";adb devices");
 			}
 			else
@@ -2105,8 +2130,8 @@ INNER_BREAK:
 				sb.append("/platform-tools");
 				sb.append(";%PATH%");
 				
-				sb.append("&&adb kill-server");
-				sb.append("&&adb start-server");
+				//sb.append("&&adb kill-server");
+				//sb.append("&&adb start-server");
 				sb.append("&&adb devices");
 				sb.append("\n");
 			}
@@ -2123,7 +2148,7 @@ INNER_BREAK:
 			{
 				try
 				{
-					Thread.sleep(250);
+					Thread.sleep(350);
 				}
 				catch (InterruptedException ie)
 				{
@@ -2203,12 +2228,254 @@ INNER_BREAK:
 				System.out.println("["+iJ+"]: '"+(String)DevicesAr.get(iJ)+"'");
 /**/
 
-			//bDevicesFinished = true;
-			completeLatch.countDown();
+			bDevicesFinished = true;
+			//completeLatch.countDown();
 			
 		}
 	}	//}}}
 
+	//{{{   FindSDcardBgThread
+	class FindSDcardBgThread extends Thread
+	{
+		public void run()
+		{
+			//System.out.println("FindSDcardBgThread run()");
+	    
+            StringBuffer sb = new StringBuffer();
+            StringBuffer sB;
+            StringBuffer pathSb;
+            StringTokenizer st;
+            
+            String sT = "";
+            String sLead = "";
+            String sRootPath = "";
+            
+            String[] tSa;
+            int iCount = 0;
+            int iTokIndex = 0;
+            int iLoc2 = 0;
+            int iLoc3 = 0;
+            char cTChr;
+            
+            if ( iOS == LINUX_MAC )
+            {
+                sb.append("export PATH=${PATH}:");
+                sb.append(androidSdkPathS);
+                sb.append("/platform-tools");
+                sb.append(";adb ");
+            }
+            else
+            {
+                sb.append("SET PATH=");
+                sb.append(androidSdkPathS);
+                sb.append("/platform-tools");
+                sb.append(";%PATH%");
+                sb.append("&&adb ");
+            }
+            
+            if ( (sDeviceName != null) && (sDeviceName.length() > 0) )
+            {
+                sb.append("-s ");
+                sb.append(sDeviceName);
+                sb.append(" ");
+            }
+
+            sb.append("shell ls ");
+            sLead = sb.toString();      // Save..
+            
+            sb.append("-l /sdcard");
+
+            if ( iOS == WINDOWS )
+                sb.append("\n");
+
+            //System.out.println("(Command)sb: '"+sb.toString()+"'");
+            
+            bCommandFinished = false;
+            sInternalCommand = sb.toString();
+            commandBgThread = new CommandBgThread();
+            commandBgThread.start();
+
+            // Wait for Thread to finish..
+            while ( true )
+            {
+                try
+                {
+                    Thread.sleep(150);
+                }
+                catch (InterruptedException ie)
+                {
+                }
+
+                if ( bCommandFinished )
+                    break;
+            }
+
+            //System.out.println("commandResultS: "+commandResultS);
+ 
+            // lrw-r--r-- 1 root root 21 2008-12-31 10:00 /sdcard -> /storage/self/primary
+            iLoc2 = commandResultS.indexOf("->");
+            if ( iLoc2 != -1 )
+            {
+                iLoc3 = commandResultS.indexOf("/", (iLoc2 + 4));
+                if ( iLoc3 != -1 )
+                {
+                    sRootPath = commandResultS.substring((iLoc2 + 2), iLoc3);
+                    sRootPath = sRootPath.trim();
+                }
+            }
+
+            sb = new StringBuffer();
+            sb.append(sLead);
+            sb.append(sRootPath);
+            
+            if ( iOS == WINDOWS )
+                sb.append("\n");
+            
+            //System.out.println("(Command)sb: '"+sb.toString()+"'");
+            
+            bCommandFinished = false;
+            sInternalCommand = sb.toString();
+            commandBgThread = new CommandBgThread();
+            commandBgThread.start();
+
+            // Wait for Thread to finish..
+            while ( true )
+            {
+                try
+                {
+                    Thread.sleep(150);
+                }
+                catch (InterruptedException ie)
+                {
+                }
+
+                if ( bCommandFinished )
+                    break;
+            }
+
+            st = new StringTokenizer(commandResultS);
+            iCount = st.countTokens();
+            //System.out.println("iCount: "+iCount);
+            tSa = new String[iCount];
+            
+            for ( iTokIndex = 0; st.hasMoreTokens(); iTokIndex++ )
+            {
+                sT = st.nextToken();
+                sT = sT.trim();
+                //System.out.println("sT: '"+sT+"'");                
+                tSa[iTokIndex] = sT;    // Like:  '004E-A507'
+            }
+
+            for ( int iM = 0; iM < tSa.length; iM++ )
+            {
+                //System.out.println("--TOP-- iM: "+iM);
+                sb = new StringBuffer();
+                
+                pathSb = new StringBuffer();
+                pathSb.append(sRootPath);
+                
+                sb.append(sLead);  
+                sb.append(sRootPath);
+                sb.append('/');
+                sb.append(tSa[iM]);
+
+                // Prevent permission error..                
+                if ( tSa[iM].equals("emulated") )
+                {
+                    sb.append("/0");
+                    pathSb.append("/emulated/0");
+                }
+                else
+                {
+                    pathSb.append("/");
+                    pathSb.append(tSa[iM]);
+                }
+                
+                sInternalCommand = sb.toString();
+                
+                if ( iOS == WINDOWS )
+                    sInternalCommand = sInternalCommand + "\n";
+                
+                //System.out.println("(Command)sb: '"+sb.toString()+"'");
+                
+                bCommandFinished = false;
+                commandBgThread = new CommandBgThread();
+                commandBgThread.start();
+    
+                // Wait for Thread to finish..
+                while ( true )
+                {
+                    try
+                    {
+                        Thread.sleep(150);
+                    }
+                    catch (InterruptedException ie)
+                    {
+                    }
+    
+                    if ( bCommandFinished )
+                        break;
+                }
+
+                if ( commandResultS.contains("DCIM") )
+                {
+                    sb.append("/DCIM");
+                    pathSb.append("/DCIM");
+
+                    //System.out.println("\n(Command)sb: '"+sb.toString()+"'");
+                    
+                    bCommandFinished = false;
+                    sInternalCommand = sb.toString();
+                    commandBgThread = new CommandBgThread();
+                    commandBgThread.start();
+        
+                    // Wait for Thread to finish..
+                    while ( true )
+                    {
+                        try
+                        {
+                            Thread.sleep(150);
+                        }
+                        catch (InterruptedException ie)
+                        {
+                        }
+        
+                        if ( bCommandFinished )
+                            break;
+                    }
+                    
+                    if ( commandResultS.contains("Screenshots") ) 
+                    {
+                        pathSb.append("/Screenshots");
+                        sScreenshotPath = pathSb.toString();
+                        //System.out.println("\nsScreenshotPath: '"+sScreenshotPath+"'");
+                    }
+                    else if ( commandResultS.contains("Camera") )
+                    {
+                        pathSb.append("/Camera");
+                        sCameraPath = pathSb.toString();
+                        //System.out.println("\nsCameraPath: '"+sCameraPath+"'");
+                    }
+                    
+                    if (  tSa[iM].equals("emulated") || tSa[iM].equals("self") )
+                        ;
+                    else
+                    {
+                        // 'sSDcardPath'..
+                        sB = new StringBuffer();
+                        sB.append(sRootPath);
+                        sB.append('/');
+                        sB.append(tSa[iM]);
+                        
+                        sSDcardPath = sB.toString();
+                        //System.out.println("sSDcardPath: '"+sSDcardPath+"'");
+                    }
+                }
+                
+            }   // End for..
+		}
+	}    //}}}
+	
 	//{{{	InitWirelessBgThread
 	class InitWirelessBgThread extends Thread
 	{
@@ -4166,9 +4433,17 @@ INNER_BREAK:
 			else if ( PULL_SCREENSHOT.equals(sActionCommand) )
 			{
 			    //System.out.println("PULL_SCREENSHOT");
+			    if ( (DevicesAr != null) && (DevicesAr.size() > 0) )
+			        ;
+			    else
+			        return;
+			    
 			    SingletonClass sc = SingletonClass.getInstance();
 			    if ( sc.bConnected == false )
 			        return;
+			    
+			    byte[] bZd = {(byte)0x0d};
+			    String sbZd = new String(bZd);
 			    
 			    RefreshProperties();
 			    sb = new StringBuffer();
@@ -4198,8 +4473,16 @@ INNER_BREAK:
 /**/
 			    
                 sb.append(" shell ls ");
+                
                 if ( (sScreenshotDir != null) && (sScreenshotDir.length() > 0) )
+                {
                     sb.append(sScreenshotDir);
+                }
+                else
+                {
+                    if ( sScreenshotPath != null )
+                        sb.append(sScreenshotPath);
+                }
 
                 if ( iOS == WINDOWS )
                     sb.append("\n");
@@ -4224,8 +4507,26 @@ INNER_BREAK:
                     if ( bCommandFinished )
                         break;
                 }
+
+                //System.out.println("commandResultS: "+commandResultS); 
+/*                
+                System.out.println();
+                char cTChr;
                 
-                st = new StringTokenizer(commandResultS);
+                for ( int g = 0; g < commandResultS.length(); g++ )
+                {
+                    cTChr = (char)commandResultS.charAt(g);
+                    if ( (cTChr < 0x20) || (cTChr > 0x7e) )
+                        System.out.print("["+Integer.toHexString((int)cTChr)+"]");
+                    else
+                        System.out.print(cTChr);
+                }
+                System.out.println();
+/**/
+                
+                
+                //      [java] Screenshot_20230131_092811_One UI Home.jpg[d][a]Screenshot_20230201_104133_One UI Home.jpg[d][a]                
+                st = new StringTokenizer(commandResultS, sbZd);
                 iCount = st.countTokens();
                 //System.out.println("iCount: "+iCount);
                 tokSa = new String[iCount];
@@ -4236,7 +4537,8 @@ INNER_BREAK:
                     sT = sT.trim();
                     if ( sT.equals("*") )
                         break;
-                    
+
+                    System.out.println("["+iTokIndex+"]: '"+tokSa[iTokIndex]+"'");                    
                     tokSa[iTokIndex] = sT;
                 }
 
@@ -4310,17 +4612,26 @@ INNER_BREAK:
                         sb.append("pull ");
                         if ( (sScreenshotDir != null) && (sScreenshotDir.length() > 0) )
                             sb.append(sScreenshotDir);
+                        else
+                        {
+                            if ( sScreenshotPath != null )
+                                sb.append(sScreenshotPath);
+                        }
                         
                         sb.append("/");
                         if ( (sListSelection != null) && (sListSelection.length() > 0) )
+                        {
+                            sb.append('"');
                             sb.append(sListSelection);
+                            sb.append('"');
+                        }
                         
                         sb.append(" ");
                         if ( (sDownloadDir != null) && (sDownloadDir.length() > 0) )
                         {
-                            sb.append((char)0x22);
+                            sb.append('"');
                             sb.append(sDownloadDir);
-                            sb.append((char)0x22);
+                            sb.append('"');
                         }
         
                         if ( iOS == WINDOWS )
@@ -4758,9 +5069,17 @@ INNER_BREAK:
 			else if ( PULL_CAMERA_IMAGE.equals(sActionCommand) )
 			{
 			    //System.out.println("PULL_CAMERA_IMAGE");
+			    if ( (DevicesAr != null) && (DevicesAr.size() > 0) )
+			        ;
+			    else
+			        return;
+			    
 			    SingletonClass sc = SingletonClass.getInstance();
 			    if ( sc.bConnected == false )
 			        return;
+			    
+			    byte[] bZd = {(byte)0x0d};
+			    String sbZd = new String(bZd);
 			    
 			    RefreshProperties();
 			    
@@ -4793,6 +5112,11 @@ INNER_BREAK:
                 sb.append("shell ls ");
                 if ( (sCameraDir != null) && (sCameraDir.length() > 0) )
                     sb.append(sCameraDir);
+                else
+                {
+                    if ( sCameraPath != null )
+                        sb.append(sCameraPath);
+                }
 
                 if ( iOS == WINDOWS )
                     sb.append("\n");
@@ -4819,7 +5143,7 @@ INNER_BREAK:
                         break;
                 }
                 
-                st = new StringTokenizer(commandResultS);
+                st = new StringTokenizer(commandResultS, sbZd);
                 iCount = st.countTokens();
                 //System.out.println("iCount: "+iCount);
                 tokSa = new String[iCount];
@@ -4909,17 +5233,26 @@ INNER_BREAK:
                         sb.append("pull ");
                         if ( (sCameraDir != null) && (sCameraDir.length() > 0) )
                             sb.append(sCameraDir);
+                        else
+                        {
+                            if ( sCameraPath != null )
+                                sb.append(sCameraPath);
+                        }
                         
                         sb.append("/");
                         if ( (sListSelection != null) && (sListSelection.length() > 0) )
+                        {
+                            sb.append('"');
                             sb.append(sListSelection);
+                            sb.append('"');
+                        }
                         
                         sb.append(" ");
                         if ( (sDownloadDir != null) && (sDownloadDir.length() > 0) )
                         {
-                            sb.append((char)0x22);
+                            sb.append('"');
                             sb.append(sDownloadDir);
-                            sb.append((char)0x22);
+                            sb.append('"');
                         }
         
                         if ( iOS == WINDOWS )
@@ -5267,18 +5600,26 @@ INNER_BREAK:
 			    RefreshProperties();
 			    
 				DevicesAr = new ArrayList();				
-				completeLatch = new CountDownLatch(1);
+				//completeLatch = new CountDownLatch(1);
 				
+				bDevicesFinished = false;
 				getDevicesBgThread = new GetDevicesBgThread();
 				getDevicesBgThread.start();
 
-				try
+				while ( true )
 				{
-					completeLatch.await();
-				}
-				catch (InterruptedException ie)
-				{
-				}
+                    try
+                    {
+                        //completeLatch.await();
+                        Thread.sleep(350);
+                    }
+                    catch (InterruptedException ie)
+                    {
+                    }
+                    
+                    if ( bDevicesFinished )
+                        break;
+                }
 
 /*				
 				if ( DevicesAr == null )
@@ -5652,18 +5993,26 @@ INNER_BREAK:
 					}
 				}
 
-				//bDevicesFinished = false;
-				completeLatch = new CountDownLatch(1);
+				bDevicesFinished = false;
+				//completeLatch = new CountDownLatch(1);
+				
 				getDevicesBgThread = new GetDevicesBgThread();
 				getDevicesBgThread.start();
-				
-				try
-				{
-					completeLatch.await();
-				}
-				catch (InterruptedException ie)
-				{
-				}
+
+                while ( true )
+                {
+                    try
+                    {
+                        //completeLatch.await();
+                        Thread.sleep(350);
+                    }
+                    catch (InterruptedException ie)
+                    {
+                    }
+                    
+                    if ( bDevicesFinished )
+                        break;
+                }
 
 
 				if ( (DevicesAr != null) && (DevicesAr.size() > 1) )
@@ -5695,6 +6044,11 @@ INNER_BREAK:
 			else if ( DELETE_FILE.equals(sActionCommand) )
 			{
 			    //System.out.println("DELETE_FILE");
+			    if ( (DevicesAr != null) && (DevicesAr.size() > 0) )
+			        ;
+			    else
+			        return;
+			    
 			    SingletonClass sc = SingletonClass.getInstance();
 			    if ( sc.bConnected == false )
 			        return;
@@ -5707,9 +6061,9 @@ INNER_BREAK:
 			}
 			else if ( SELECT_FILE_GO.equals(sActionCommand) )
 			{
-			    //System.out.println("SELECT_FILE_GO");
+			    System.out.println("SELECT_FILE_GO");
 			    
-			    //System.out.println("sCurrentPath: '"+sCurrentPath+"'");
+			    System.out.println("sCurrentPath: '"+sCurrentPath+"'");
 			    JButton pathButton;
 /*
                 if ( selectionList == null )
@@ -5722,7 +6076,7 @@ INNER_BREAK:
                 {
                     sListSelection = selectionList.get(0);
                 }
-/*
+                
                 if ( sListSelection == null )
                     System.out.println("sListSelection null");
                 else
@@ -5735,13 +6089,27 @@ INNER_BREAK:
 			        if ( sListSelection.startsWith("[") )
 			        {
 			            sT = sListSelection.substring(1, sListSelection.length() - 1);
-			            //System.out.println("sT: '"+sT+"'");
+			            System.out.println("sT: '"+sT+"'");
 			            
 			            sB = new StringBuffer();
 			            sB.append(sCurrentPath);
 			            sB.append("/");
-			            sB.append(sT);
+			            
+			            if ( sT.equals("sdcard") && (sSDcardPath != null) )
+			                sB.append(sSDcardPath);
+			            else
+			                sB.append(sT);
+			            
 			            sCurrentPath = sB.toString();
+			            
+			            // Detect 'emulated' so we can add '/0'..
+			            if ( sCurrentPath.endsWith("emulated") )
+			            {
+			                sB.append("/0");
+			                sCurrentPath = sB.toString();
+			            }
+			            
+			            System.out.println("(New)sCurrentPath: '"+sCurrentPath+"'");
 
 			            FinishPath();
 			        }
@@ -5844,6 +6212,7 @@ INNER_BREAK:
                                     sB = new StringBuffer();
                                     if ( (sCurrentPath != null) && (sCurrentPath.length() > 0) )
                                     {
+                                        sB.append('"');
                                         sB.append(sCurrentPath);
                                         sB.append("/");
                                     }
@@ -5856,6 +6225,7 @@ INNER_BREAK:
                                         //System.out.println("(Final)sListSelection: '"+sListSelection+"'");
                                             
                                         sB.append(sListSelection);
+                                        sB.append('"');
                                     }
                                     //System.out.println("sB: '"+sB.toString()+"'");
                                     
@@ -5886,6 +6256,7 @@ INNER_BREAK:
                                 {
         
                                     sB = new StringBuffer();
+                                    sB.append('"');
                                     sB.append(sCurrentPath);    // Like: '/dev/block'
                                     sB.append("/");
                                     
@@ -5893,6 +6264,7 @@ INNER_BREAK:
         
                                     // Like:  'mmcblk0p25'
                                     sB.append(sListSelection);
+                                    sB.append('"');
                                     //System.out.println("sB: '"+sB.toString()+"'");
                                     
                                     sb.append(sB.toString());
@@ -5923,6 +6295,7 @@ INNER_BREAK:
                                 {
         
                                     sB = new StringBuffer();
+                                    sB.append('"');
                                     sB.append(sCurrentPath);    // Like: '/dev/block'
                                     sB.append("/");
                                     
@@ -5931,6 +6304,7 @@ INNER_BREAK:
                                     // Like:  'mmcblk0p25'
                                     sB.append(sListSelection);
                                     //System.out.println("sB: '"+sB.toString()+"'");
+                                    sB.append('"');
                                     
                                     sb.append(sB.toString());
                                 }
@@ -5972,6 +6346,11 @@ INNER_BREAK:
 			else if ( PUSH_FILE.equals(sActionCommand) )
 			{
 			    //System.out.println("PUSH_FILE");
+			    if ( (DevicesAr != null) && (DevicesAr.size() > 0) )
+			        ;
+			    else
+			        return;
+			    
 			    SingletonClass sc = SingletonClass.getInstance();
 			    if ( sc.bConnected == false )
 			        return;
@@ -6186,8 +6565,20 @@ INNER_BREAK:
 			            sB = new StringBuffer();
 			            sB.append(sCurrentPath);
 			            sB.append("/");
-			            sB.append(sT);
+			            
+			            if ( sT.equals("sdcard") && (sSDcardPath != null) )
+			                sB.append(sSDcardPath);
+			            else
+			                sB.append(sT);
+			            
 			            sCurrentPath = sB.toString();
+			            
+			            // Detect 'emulated' so we can add '/0'..
+			            if ( sCurrentPath.endsWith("emulated") )
+			            {
+			                sB.append("/0");
+			                sCurrentPath = sB.toString();
+			            }
 
 			            FinishPath();
 			        }
