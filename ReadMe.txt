@@ -13,11 +13,6 @@ ADB_Util
     After you do "Reboot" or "Reboot to Recovery" it will lose any Device Id,
     so you have to wait till it re-connects and do "Home->Select Device".
     
-    ** Note **
-    'sdcard' is just a symbolic link.  The actual path it uses for each device
-    can be different.  For Samsung it might be like '/storage/004E-A507', but it usually
-    starts with '/storage'.
-    You can use 'File->Pull fles' to navigate around and look at directories.
     
 Logcat:
     This lets you see all the logcat output.
@@ -43,6 +38,7 @@ Refresh Properties:
 File Browser:
     When selecting a directory, other than for Submit, you can either
     double click the selection or select the directory and hit the "Go" Button.
+    It will automatically use its symlink for given directories.
 
 Select Device:
     Allows you to select the target device, or Emulator, for Logcat output,
@@ -73,11 +69,6 @@ Wireless:
 
 Release notes:
         
-    ADB_Util 1.1.9:
-        Improved logcat.  It now clears the logcat buffer each time it starts to 
-        reduce any slowdowns caused by long previous outputs.
-        Improved PID logcat.  The secound time you would run it,
-        it wouldn't get any output, and fixed it.
     
     ADB_Util 1.2.0:
         Improved logcat.  Now uses 'brief' option for more compact output and
@@ -90,5 +81,10 @@ Release notes:
         Improved File Dialog and operations.
         Many other improvements.
     
+    ADB_Util 1.2.4:
+        Greatly improved file browsing.
+        It will now automatically use the directories symlink if available.
+        
+        
    joes0451@outlook.com
         

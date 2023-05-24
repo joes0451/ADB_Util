@@ -202,14 +202,18 @@ public class ADB_Util
     static volatile boolean bShellPsFinished;
     static volatile boolean bWakeDeviceFinished;
     static volatile boolean bCheckDeviceFinished;
+    static volatile boolean bSelectionTimerStarted;
+    static volatile boolean bFileBrowserUpdateOkay;
     
     static volatile int iOS;
     static volatile int iListId;
     static volatile int iWirelessErrorCode;
     static volatile int iSelectMode;
     static volatile int iButtonCount;
+    static volatile int iFileBrowserSelectedIndex;
     
     static volatile long lPrevTime;
+    static volatile long lTimerEnd;
     
 	private StyledDocument doc;
 	private Style normalStyle;
@@ -327,6 +331,8 @@ public class ADB_Util
 		sCurrentPath = "";
 		iButtonCount = 0;
 		lPrevTime = 0;
+		bSelectionTimerStarted = false;
+		
 		
         SingletonClass sc = SingletonClass.getInstance();
         sc.bConnected = false;
@@ -1690,7 +1696,7 @@ public class ADB_Util
 				}
 				catch (InterruptedException ie)
 				{
-					System.out.println(ie.toString());
+					System.out.println("Exception: "+ie.toString());
 				}
 			}
 
@@ -1723,6 +1729,37 @@ public class ADB_Util
 		}
 	}	//}}}
 
+	//{{{   checkAttr()
+	public boolean checkAttr(String sIn)
+	{
+	    char cChr;
+	    
+	    if ( sIn.length() != 10 )
+	        return false;
+	    
+	    // Leading 'l' is a symlink but we treat it as a directory..
+	    if ( sIn.startsWith("d") || sIn.startsWith("l") ||
+	        sIn.startsWith("c") || sIn.startsWith("-") )
+	    {
+	        for ( int iJ = 1; iJ < sIn.length(); iJ++ )
+	        {
+	            cChr = sIn.charAt(iJ);
+	            if ( cChr == 'r' || cChr == 'w' ||
+                        cChr == 'x' || cChr == '?' ||
+                        cChr == '-' )
+                {
+	                ;
+	            }
+	            else
+	                return false;
+	        }
+	        
+	        return true;
+	    }
+	    else
+	        return false;
+	}    //}}}
+	
 	//{{{	UpdateFileBrowserBgThread
 	class UpdateFileBrowserBgThread extends Thread
 	{
@@ -1736,12 +1773,12 @@ public class ADB_Util
             StringBuffer tokSb;
             StringBuffer sNameSb = null;
             String sT = "";
+            String sSymLinkPath = "";
             int iTokIndex;
             int iLoc = 0;
             int iLoc2 = 0;
             boolean bIsDir = false;
             boolean bHitlstat = false;
-            
 /*            
             if ( sCurrentPath == null )
                 System.out.println("sCurrentPath null");
@@ -1786,7 +1823,14 @@ public class ADB_Util
             if ( (sCurrentPath != null) && (sCurrentPath.length() > 0) )
             {
                 sb.append(" ");
-                sb.append(sCurrentPath);
+                if ( sCurrentPath.contains(" ") )
+                {
+                    sb.append("'");
+                    sb.append(sCurrentPath);
+                    sb.append("'");
+                }
+                else
+                    sb.append(sCurrentPath);
                 
                 if ( (sSelectedMenu != null) && ((sSelectedMenu.equals("Pull file")) ||
                         (sSelectedMenu.equals("Delete file")) ||
@@ -1844,6 +1888,9 @@ public class ADB_Util
                     ((iLoc2 != -1) && (commandResultS.length() < 100)) )
                 {
                     //System.out.println("Failed");
+                    
+                    // Signal fail..
+                    bFileBrowserUpdateOkay = false;
 
                     if ( fileBrowserJList != null )
                         fileBrowserJList.clearSelection();
@@ -1867,13 +1914,17 @@ public class ADB_Util
                         fileBrowserJList.clearSelection();
                     
                     //System.out.println("(Final)sCurrentPath: '"+sCurrentPath+"'");
-                    
+
+                    // Leave intact if it fails..                    
                     // Signal failed..
-                    fileToksAr = new ArrayList();
+                    //fileToksAr = new ArrayList();
                 }
                 else
                 {
                     //System.out.println("OK");
+                    
+                    // Signal success..
+                    bFileBrowserUpdateOkay = true;
                 
                     fileToksAr = new ArrayList();
                     st = new StringTokenizer(commandResultS);
@@ -1892,7 +1943,7 @@ public class ADB_Util
                         //System.out.println("["+iTokIndex+"]: '"+tokSa[iTokIndex]+"'");
                     }
                     
-                    // Skip any leading..
+                    // Skip any leading, like:  'total 18198'..
                     for ( iTokIndex = 0; iTokIndex < iCount; )
                     {
                         if ( iTokIndex < tokSa.length )
@@ -1900,7 +1951,8 @@ public class ADB_Util
                             if ( ((tokSa[iTokIndex].contains("-")) && (tokSa[iTokIndex].length() == 10)) ||
                                     ((tokSa[iTokIndex].startsWith("d")) && (tokSa[iTokIndex].length() == 10)) ||
                                     ((tokSa[iTokIndex].startsWith("l")) && (tokSa[iTokIndex].length() == 10)) ||
-                                    ((tokSa[iTokIndex].startsWith("c")) && (tokSa[iTokIndex].length() == 10)) )
+                                    ((tokSa[iTokIndex].startsWith("c")) && (tokSa[iTokIndex].length() == 10)) ||
+                                    ((tokSa[iTokIndex].startsWith("-")) && (tokSa[iTokIndex].length() == 10)) )
                                 break;
                         }
                         else
@@ -1908,6 +1960,13 @@ public class ADB_Util
                             
                         iTokIndex++; 
                     }
+
+                    // Note:
+                    // In this new case, it didn't get it right
+                    // It only showed 'Screen' and wouldn't let you see
+                    // the contents..
+                    
+                    // drwxrwx--- 2 root everybody 3452 2023-05-10 11:52 Screen recordings
                     
                     
                      // crw-rw-rw- system   graphics  10,  42 2021-07-27 15:53 ion
@@ -1922,12 +1981,17 @@ public class ADB_Util
                     
                     //System.out.println("\ntokSa.length: "+tokSa.length);
                     bHitlstat = false;
+                    boolean bDidFirst = false;
+                    boolean bStartedNm = false;
+                    boolean bSkipToNext = false;
+                    boolean bHitQuestion = false;
                     
-BREAK_OUT:                        
+//BREAK_OUT:                        
                     for ( ; iTokIndex < iCount; )
                     {
                         //System.out.println("--TOP-- iTokIndex: "+iTokIndex);
-                        sNameSb = new StringBuffer();
+                        //sNameSb = new StringBuffer();
+                        bHitQuestion = false;
                         
                         // At first token..
                         if ( iTokIndex < tokSa.length )
@@ -1948,134 +2012,162 @@ BREAK_OUT:
                                 //System.out.println("Found :");
                                 if ( iTokIndex < tokSa.length )
                                 {
-                                    if ( tokSa[iTokIndex].contains(":") )
-                                        break;
-                                }
-                                else
-                                    break;
-                            }
-                            
-                            iTokIndex++;
-                            if ( iTokIndex < tokSa.length )
-                            {
-                                sNameSb.append(tokSa[iTokIndex]);
-                                sNameSb.append(" ");
-                            }
-                            //System.out.println("(1)sNameSb: '"+sNameSb.toString()+"'");
-                            
-                            //      [java] drwxrwx--- root     sdcard_r          2020-02-27 16:39 Digital Editions
-
-                           
-                            // Get name..
-                            //System.out.println("bIsDir: "+bIsDir);
-                            if ( bIsDir )
-                            {
-                                if ( iTokIndex < tokSa.length )
-                                {
-                                    tokSb = new StringBuffer();
-                                    tokSb.append("[");
-                                    tokSb.append(tokSa[iTokIndex]);
-                                    tokSb.append("]");
-                                    //System.out.println("(Add): '"+tokSb.toString()+"'");
-                                    fileToksAr.add((String)tokSb.toString());
-                                }
-                            }
-                            
-                            // 12:49 vendor -> /system/vendor   
-                            // 12:49 storage
-                            // 16:39 Digital Editions
-                            //System.out.println("tokSa.length: "+tokSa.length);
-
-INNER_BREAK:                                
-                            while ( true )
-                            {
-                                //System.out.println("==TOP== iTokIndex: "+iTokIndex);
-                                if ( (iTokIndex + 1) < tokSa.length )
-                                {
-                                    iTokIndex++;
-                                    if ( tokSa[iTokIndex].startsWith("->") )
+                                    if ( tokSa[iTokIndex].equals("?") )
                                     {
-                                        iTokIndex += 2;
-                                        break;
+                                        bHitQuestion = true;
                                     }
-                                    
-                                    if ( ((tokSa[iTokIndex].contains("-")) && (tokSa[iTokIndex].length() == 10)) ||
-                                        ((tokSa[iTokIndex].startsWith("d")) && (tokSa[iTokIndex].length() == 10)) ||
-                                        ((tokSa[iTokIndex].startsWith("l")) && (tokSa[iTokIndex].length() == 10)) ||
-                                        ((tokSa[iTokIndex].startsWith("c")) && (tokSa[iTokIndex].length() == 10)) )
+                                    else if ( tokSa[iTokIndex].contains(":") )
                                     {
-                                        // At 'drwxrwx---'..
                                         break;
                                     }
                                     else
                                     {
-                                        //System.out.println("tokSa[iTokIndex]: '"+tokSa[iTokIndex]+"'");
-                                        if ( tokSa[iTokIndex].equals("lstat") )
+                                        // Hit name..
+                                        if ( bHitQuestion )
                                         {
-                                            //System.out.println("\n---HIT lstat");
-                                            bHitlstat = true;
-                                            
-                                            while ( true )
-                                            {
-                                                if ( (iTokIndex + 1) < tokSa.length )
-                                                {
-                                                    iTokIndex++;
-                                                    if ( ((tokSa[iTokIndex].contains("-")) && (tokSa[iTokIndex].length() == 10)) ||
-                                                        ((tokSa[iTokIndex].startsWith("d")) && (tokSa[iTokIndex].length() == 10)) ||
-                                                        ((tokSa[iTokIndex].startsWith("l")) && (tokSa[iTokIndex].length() == 10)) ||
-                                                        ((tokSa[iTokIndex].startsWith("c")) && (tokSa[iTokIndex].length() == 10)) )
-                                                    {
-                                                        // At 'drwxrwx---'..
-                                                        //break;
-                                                        break INNER_BREAK;
-                                                    }
-                                                }
-                                                else
-                                                    break;
-                                            }
-                                       }
-                                       else
-                                       {
-                                            sNameSb.append(tokSa[iTokIndex]);
-                                            sNameSb.append(" ");
-                                            //System.out.println("(2)sNameSb: '"+sNameSb.toString()+"'");
-                                       }
+                                            iTokIndex--;    // Adjust for next increment..
+                                            break;
+                                        }
                                     }
                                 }
                                 else
-                                    break BREAK_OUT;
-                            }   // End while()..
+                                    break;
+                            }
 
-                            if ( bIsDir )
-                                ;
-                            else
+                            // [8]: '11:52'
+                            // [9]: 'Screen'
+                            // [10]: 'recordings'
+                            // [11]: 'drwxrwx---'
+                            
+                            iTokIndex++;    // Get past '19:00'..
+                            //System.out.println("(At name)iTokIndex: "+iTokIndex);
+
+                            // At name..                            
+                            bStartedNm = false;
+                            bSkipToNext = false;
+                            sSymLinkPath = "";
+                            sNameSb = new StringBuffer();
+                            
+                            for ( int iZ = iTokIndex; iZ < tokSa.length; )
                             {
-                                sT = sNameSb.toString();
-                                sT = sT.trim();
-                                //System.out.println("(Add)sT: '"+sT+"'");
-                                fileToksAr.add((String)sT);
+                                // Look for end leading token 'drwxrwx---'..
+                                // Leading 'l' is a symlink but we treat it as a directory..
+                                if ( checkAttr(tokSa[iZ]) )
+                                {
+                                    // Hit token after name..
+                                    iTokIndex = iZ;
+                                    //System.out.println("(After lead)iTokIndex: "+iTokIndex);
+                                    break;
+                                }
+                                else if ( tokSa[iZ].equals("lstat") )
+                                {
+                                    // Skip everything till we hit new start..
+                                    //System.out.println("\n---HIT lstat");
+                                    //bHitlstat = true;
+                                    bSkipToNext = true;
+                                }
+                                else if ( iZ == (tokSa.length - 1) )
+                                {
+                                    // Last token in block..
+                                    if ( bSkipToNext )
+                                    {
+                                        break;
+                                    }
+                                    else
+                                    {
+                                        if ( bStartedNm )
+                                            sNameSb.append(" ");
+                                            
+                                        sNameSb.append(tokSa[iZ]);
+                                        break;
+                                    }
+                                }
+                                else
+                                {
+                                    if ( bSkipToNext )
+                                        ;
+                                    else
+                                    {
+                                        if ( bStartedNm )
+                                        {
+                                            // Second or more..
+                                            // 12:49 vendor -> /system/vendor
+                                            // 11:52 Screen recordings
+                                            
+                                            if ( tokSa[iZ].startsWith("->") )
+                                            {
+                                                // Symlink, so treat next token as the new path
+                                                sSymLinkPath = tokSa[iZ + 1];
+                                                bSkipToNext = true;
+                                                //iZ += 2;
+                                                //break;
+                                            }
+                                            else
+                                            {
+                                                sNameSb.append(" ");
+                                                sNameSb.append(tokSa[iZ]);
+                                            }
+                                        }
+                                        else
+                                        {
+                                            // First name token..
+                                            sNameSb.append(tokSa[iZ]);
+                                            bStartedNm = true;
+                                        }
+                                    }
+                                }
+                                
+                                iZ++;   // Next..
+                            }   // End for..
+
+                            if ( (sNameSb != null) && (sNameSb.length() > 0) )
+                            {
+                                if ( bIsDir )
+                                {
+                                    tokSb = new StringBuffer();
+                                    tokSb.append("[");
+                                    tokSb.append(sNameSb.toString());
+                                    //tokSb.append("]");
+                                    tokSb.append("]~");
+                                    tokSb.append(sSymLinkPath);
+                                    
+                                    //System.out.println("(Add): '"+tokSb.toString()+"'");
+                                    fileToksAr.add((String)tokSb.toString());
+                                }
+                                else
+                                {
+                                    tokSb = new StringBuffer();
+                                    sT = sNameSb.toString();
+                                    sT = sT.trim();
+                                    tokSb.append(sT);
+                                    tokSb.append("~");
+                                    tokSb.append(sSymLinkPath);
+                                    
+                                    //System.out.println("(Add): '"+sT+"'");
+                                    fileToksAr.add((String)tokSb.toString());
+                                    //fileToksAr.add((String)sT);
+                                }
                             }
                         }
-                        else
-                        {
-                            break;
-                        }
-                        
                     }   // End for..
-                    
-                    if ( bIsDir )
-                        ;
-                    else
-                    {
-                        sT = sNameSb.toString();
-                        sT = sT.trim();
-                        //System.out.println("(Add)sT: '"+sT+"'");
-                        fileToksAr.add((String)sT);
-                    }
                 }
-            
-                //System.out.println("Dropped out");
             }
+                            
+                            
+                            
+                            
+            //System.out.println("\nsNameSb: '"+sNameSb.toString()+"'");
+            //System.out.println("tokSa["+iTokIndex+"]: '"+tokSa[iTokIndex]+"'");
+
+            //System.out.println("(1)sNameSb: '"+sNameSb.toString()+"'");
+            
+            //      [java] drwxrwx--- root     sdcard_r          2020-02-27 16:39 Digital Editions
+
+            // 12:49 vendor -> /system/vendor   
+            // 12:49 storage
+            // 16:39 Digital Editions
+            //System.out.println("tokSa.length: "+tokSa.length);
+ 
 /*
             if ( fileToksAr == null )
                 System.out.println("fileToksAr null");
@@ -3294,6 +3386,9 @@ INNER_BREAK:
 	    //System.out.println("\nFinishPath()");
 	    // Update Path Buttons and JList..
 	    
+	    // Takes 'sCurrentPath' and breaks it into tokens
+	    // to help create the buttons..
+	    
         //System.out.println("(In)sCurrentPath: '"+sCurrentPath+"'");
         StringTokenizer st;
         StringBuffer sB;
@@ -3332,7 +3427,7 @@ INNER_BREAK:
         }
         
         // Check for failed..
-        if ( (fileToksAr != null) && (fileToksAr.size() > 0) )
+        if ( bFileBrowserUpdateOkay )
         {
             // Update path buttons..
             if ( pathButtonPanel != null )
@@ -3415,12 +3510,21 @@ INNER_BREAK:
             // Update JList..
             if ( (fileToksAr != null) && (fileToksAr.size() > 0) )
             {
+                int iLoc = 0;
                 DefaultListModel dlModel = new DefaultListModel();
                 fileBrowserJList.setModel(dlModel);
                 dlModel.clear();
                 for( int i = 0; i < fileToksAr.size(); i++ )
                 {
                     sT = (String)fileToksAr.get(i);
+                    if ( sT != null )
+                    {
+                        iLoc = sT.indexOf("~");
+                        if ( iLoc != -1 )
+                        {
+                            sT = sT.substring(0, iLoc);
+                        }
+                    }
                     //System.out.println("["+i+"]: '"+sT+"'");
                     dlModel.addElement((String)sT);
                 }
@@ -3995,11 +4099,24 @@ INNER_BREAK:
 
         if ( (fileToksAr != null) && (fileToksAr.size() > 0) )
         {
+            sT = "";
+            int iLoc = 0;
             listSa = new String[fileToksAr.size()];
             
             for ( int g = 0; g < fileToksAr.size(); g++ )
             {
-                listSa[g] = (String)fileToksAr.get(g);
+                sT = (String)fileToksAr.get(g);
+                if ( sT != null )
+                {
+                    iLoc = sT.indexOf("~");
+                    if ( iLoc != -1 )
+                    {
+                        sT = sT.substring(0, iLoc);
+                    }
+                }
+                
+                //listSa[g] = (String)fileToksAr.get(g);
+                listSa[g] = (String)sT;
                 //System.out.println("listSa["+g+"]: '"+listSa[g]+"'");
             }
 
@@ -4538,7 +4655,7 @@ INNER_BREAK:
                     if ( sT.equals("*") )
                         break;
 
-                    System.out.println("["+iTokIndex+"]: '"+tokSa[iTokIndex]+"'");                    
+                    //System.out.println("["+iTokIndex+"]: '"+tokSa[iTokIndex]+"'");                    
                     tokSa[iTokIndex] = sT;
                 }
 
@@ -6061,10 +6178,13 @@ INNER_BREAK:
 			}
 			else if ( SELECT_FILE_GO.equals(sActionCommand) )
 			{
-			    System.out.println("SELECT_FILE_GO");
+			    //System.out.println("SELECT_FILE_GO");
 			    
-			    System.out.println("sCurrentPath: '"+sCurrentPath+"'");
+			    //System.out.println("sCurrentPath: '"+sCurrentPath+"'");
 			    JButton pathButton;
+			    String sSymLinkPath = "";
+			    iLoc = 0;
+			    //int iSelIndex = 0;
 /*
                 if ( selectionList == null )
                     System.out.println("selectionList null");
@@ -6076,29 +6196,64 @@ INNER_BREAK:
                 {
                     sListSelection = selectionList.get(0);
                 }
-                
+/*                
                 if ( sListSelection == null )
-                    System.out.println("sListSelection null");
+                    System.out.println("(GO)sListSelection null");
                 else
-                    System.out.println("sListSelection: '"+sListSelection+"'");
+                    System.out.println("(GO)sListSelection: '"+sListSelection+"'");
 /**/                        
-                        
+
+
+                //System.out.println("iFileBrowserSelectedIndex: "+iFileBrowserSelectedIndex);
+
+                // Note:
+                // If the name contains any spaces we need to surround
+                // the whole path with single quotes or it won't process it right..
 			    if ( (sListSelection != null) && (sListSelection.length() > 0) )
 			    {
+/*			        
+			        if ( fileToksAr == null )
+			            System.out.println("fileToksAr null");
+			        else
+			            System.out.println("fileToksAr.size(): "+fileToksAr.size());
+/**/			        
+			        
+		            if ( (fileToksAr != null) && (fileToksAr.size() > 0) )
+		            {
+		                sT = (String)fileToksAr.get(iFileBrowserSelectedIndex);
+		                //System.out.println("sT: '"+sT+"'");
+		                iLoc = sT.indexOf("~");
+		                if ( iLoc != -1 )
+		                {
+		                    sSymLinkPath = sT.substring(iLoc + 1);
+		                    if ( sSymLinkPath.startsWith("?") )
+		                        sSymLinkPath = "";
+		                }
+		            }
+			        
+			        
 			        //System.out.println("sListSelection: '"+sListSelection+"'");
 			        if ( sListSelection.startsWith("[") )
 			        {
+			            // Strip off brackets..
 			            sT = sListSelection.substring(1, sListSelection.length() - 1);
-			            System.out.println("sT: '"+sT+"'");
+			            //System.out.println("sT: '"+sT+"'");
 			            
 			            sB = new StringBuffer();
 			            sB.append(sCurrentPath);
-			            sB.append("/");
 			            
-			            if ( sT.equals("sdcard") && (sSDcardPath != null) )
-			                sB.append(sSDcardPath);
-			            else
-			                sB.append(sT);
+                        if ( (sSymLinkPath != null) && (sSymLinkPath.length() > 0) &&
+                            (! sSymLinkPath.equals("null")) )
+                        {
+                            // Use symlink, has leading '/' so don't add it..
+                            sB.append(sSymLinkPath);
+                        }
+                        else
+                        {
+                            // Use regular selection..
+                            sB.append("/");
+                            sB.append(sT);
+                        }
 			            
 			            sCurrentPath = sB.toString();
 			            
@@ -6109,7 +6264,7 @@ INNER_BREAK:
 			                sCurrentPath = sB.toString();
 			            }
 			            
-			            System.out.println("(New)sCurrentPath: '"+sCurrentPath+"'");
+			            //System.out.println("(New)sCurrentPath: '"+sCurrentPath+"'");
 
 			            FinishPath();
 			        }
@@ -6540,36 +6695,74 @@ INNER_BREAK:
 		{
 		    //System.out.println("\nMouseListener mouseClicked()");
 		    String sT = "";
+		    String sPath = "";
+		    String sSymLinkPath = "";
 		    StringBuffer sB;
+		    int iLoc = 0;
 		    
 		    JList jList = (JList)e.getSource();
 		    int iClickCount = e.getClickCount();
 		    //System.out.println("iClickCount: "+iClickCount);
 		    if ( iClickCount == 2 )
 		    {
+		        // Get tokens from selection..
 		        int iIndex = jList.locationToIndex(e.getPoint());
 		        //System.out.println("iIndex: "+iIndex);
 		        if ( iIndex >= 0 )
 		        {
-		            // Gets like:  '[sdcard]'
-		            Object object = jList.getModel().getElementAt(iIndex);
-		            //System.out.println("object.toString(): "+object.toString());
-		            sListSelection = object.toString();
+/*		  
+		            if ( fileToksAr == null )
+		                System.out.println("fileToksAr null");
+		            else
+		                System.out.println("fileToksAr.size(): "+fileToksAr.size());
+/**/
 
+		            if ( (fileToksAr != null) && (fileToksAr.size() > 0) )
+		            {
+		                sT = (String)fileToksAr.get(iIndex);
+		                //System.out.println("sT: '"+sT+"'");
+		                iLoc = sT.indexOf("~");
+		                if ( iLoc != -1 )
+		                {
+		                    sSymLinkPath = sT.substring(iLoc + 1);
+		                    if ( sSymLinkPath.startsWith("?") )
+		                        sSymLinkPath = "";
+		                }
+		            }
+		            
+		            //System.out.println("sCurrentPath: '"+sCurrentPath+"'");
+		            
+/*                    
+                    if ( sT == null )
+                        System.out.println("sT null");
+                    else
+                        System.out.println("sT: '"+sT+"'");
+/**/                    
+                    
                     // From 'Go'..		            
-			        if ( sListSelection.startsWith("[") )
+			        if ( sT.startsWith("[") )
 			        {
-			            sT = sListSelection.substring(1, sListSelection.length() - 1);
+			            // Strip off brackets..
+			            // '[sdcard]~/storage/self/primary'
+			            //          ^
+			            sT = sT.substring(1, iLoc - 1);
 			            //System.out.println("sT: '"+sT+"'");
 			            
 			            sB = new StringBuffer();
 			            sB.append(sCurrentPath);
-			            sB.append("/");
 			            
-			            if ( sT.equals("sdcard") && (sSDcardPath != null) )
-			                sB.append(sSDcardPath);
-			            else
-			                sB.append(sT);
+                        if ( (sSymLinkPath != null) && (sSymLinkPath.length() > 0) &&
+                            (! sSymLinkPath.equals("null")) )
+                        {
+                            // Use symlink, has leading '/' so don't add it..
+                            sB.append(sSymLinkPath);
+                        }
+                        else
+                        {
+                            // Use regular selection..
+                            sB.append("/");
+                            sB.append(sT);
+                        }
 			            
 			            sCurrentPath = sB.toString();
 			            
@@ -6592,12 +6785,15 @@ INNER_BREAK:
 	{
 		public void valueChanged(ListSelectionEvent e)
 		{
-			//("\nListSelectionListener valueChanged()");
+			//System.out.println("\nListSelectionListener valueChanged()");
 			//System.out.println("e.toString(): "+e.toString());
 			int iFirstIndex = e.getFirstIndex();
 			int[] iSelAr;
 			long lTime;
+			//long lTimerEnd = 0;
 			boolean bDoGo = false;
+			//boolean bSelectionTimerStarted = false;
+			boolean bProcess = false;
 			StringBuffer sB;
 			String sT = "";
 			//List<String> selList = new ArrayList<String>();
@@ -6628,36 +6824,76 @@ INNER_BREAK:
 			else if ( iListId == FILE_BROWSER_LIST )
 			{
 			    //System.out.println("FILE_BROWSER_LIST");
-			    if ( fileBrowserJList != null )
+			    
+			    // Note:
+			    // It looks like it goes in again here so rapidly
+			    // that the index keeps getting wiped out..
+			    long lCurrTime = System.currentTimeMillis();
+			    //System.out.println("lCurrTime: "+lCurrTime);
+			    bProcess = false;
+			    
+			    //System.out.println("bSelectionTimerStarted: "+bSelectionTimerStarted);
+			    if ( bSelectionTimerStarted )
 			    {
-			        //sListSelection = (String)fileBrowserJList.getSelectedValue();
-			        
-			        selectionList = fileBrowserJList.getSelectedValuesList();
-/*
+			        //System.out.println("lTimerEnd: "+lTimerEnd);
+			        if ( lCurrTime > lTimerEnd )
+			        {
+			            // Time expired, okay to process..
+			            bSelectionTimerStarted = false;    // Reset..
+			            bProcess = true;
+			        }
+			        else
+			        {
+			            // Within time period, ignore..
+			            ;
+			        }
+			    }
+			    else
+			    {
+			        // Timer off, start it..
+			        lTimerEnd = lCurrTime + 1500;
+			        //System.out.println("lTimerEnd: "+lTimerEnd);
+			        bSelectionTimerStarted = true;
+			        bProcess = true;
+			    }
+			   
+                if ( fileBrowserJList != null )
+                {
+                    //sListSelection = (String)fileBrowserJList.getSelectedValue();
+
+                    // Just prevent the index from being reset..
+                    if ( bProcess )
+                    {
+                        iFileBrowserSelectedIndex = fileBrowserJList.getSelectedIndex();
+                        //System.out.println("(getSelectedIndex())iFileBrowserSelectedIndex: "+iFileBrowserSelectedIndex);
+                    }
+                    
+                    
+                    selectionList = fileBrowserJList.getSelectedValuesList();
+
+/*			        
                     if ( selectionList == null )
                         System.out.println("selectionList null");
                     else
+                    {
                         System.out.println("selectionList.size(): "+selectionList.size());
+                        for ( int iJ = 0; iJ < selectionList.size(); iJ++ )
+                            System.out.println("selectionList ["+iJ+"]: '"+selectionList.get(iJ)+"'");
+                        
+                    }
 /**/
 
+                    
 /*			        
-			        if ((selectionList != null) && (selectionList.size() > 0))
-			        {
-			            for ( int iJ = 0; iJ < selectionList.size(); iJ++ )
-			                System.out.println("selectionList ["+iJ+"]: '"+selectionList.get(iJ)+"'");
-			        }
+                    iSelAr = fileBrowserJList.getSelectedIndices();
+                    if ((iSelAr != null) && (iSelAr.length > 0))
+                    {
+                        for ( int iJ = 0; iJ < iSelAr.length; iJ++ )
+                            System.out.println("iSelAr["+iJ+"]: "+iSelAr[iJ]);
+                        
+                    }
 /**/			        
-			        
-/*			        
-			        iSelAr = fileBrowserJList.getSelectedIndices();
-			        if ((iSelAr != null) && (iSelAr.length > 0))
-			        {
-			            for ( int iJ = 0; iJ < iSelAr.length; iJ++ )
-			                System.out.println("iSelAr["+iJ+"]: "+iSelAr[iJ]);
-			            
-			        }
-/**/			        
-			    }
+                }
 			}
 		}
 	}; //}}}
