@@ -5,7 +5,7 @@
 /**
  *	  ADB_Util is a utility for Android ADB
  *
- *	  Copyright (c) 2023 Joseph Siebenmann
+ *	  Copyright (c) 2024 Joseph Siebenmann
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the GNU General  Public License as published by
@@ -38,6 +38,7 @@ import javax.swing.filechooser.FileNameExtensionFilter;
 import javax.swing.filechooser.FileFilter;
 import javax.swing.filechooser.FileSystemView;
 import javax.swing.DefaultListModel;
+import javax.swing.JOptionPane;
 import javax.swing.*;
 import java.awt.Color;
 //import java.awt.List;
@@ -182,6 +183,7 @@ public class ADB_Util
     static volatile String sSDcardPath;
     static volatile String sScreenshotPath;
     static volatile String sCameraPath;
+    private String internalCommandS;
     
     static volatile String[] tokSa;
     
@@ -204,6 +206,8 @@ public class ADB_Util
     static volatile boolean bCheckDeviceFinished;
     static volatile boolean bSelectionTimerStarted;
     static volatile boolean bFileBrowserUpdateOkay;
+    static volatile boolean bInternalFinished;
+    static volatile boolean bConnectWirelessFinished;
     
     static volatile int iOS;
     static volatile int iListId;
@@ -227,8 +231,8 @@ public class ADB_Util
     
     static List<String> selectionList = new ArrayList<String>();
     
-    static CountDownLatch commandRequestLatch;
-    static CountDownLatch completeLatch;
+    //static CountDownLatch commandRequestLatch;
+    //static CountDownLatch completeLatch;
     
     CardLayout cardLayout;
     
@@ -336,6 +340,7 @@ public class ADB_Util
 		
         SingletonClass sc = SingletonClass.getInstance();
         sc.bConnected = false;
+        sc.s_WirelessConnected = false;
 		
 		
 		/**
@@ -2567,6 +2572,92 @@ public class ADB_Util
             }   // End for..
 		}
 	}    //}}}
+
+	//{{{   WirelessDisconnect()    
+	private void WirelessDisconnect()
+	{
+	    //System.out.println("");
+	    //System.out.println("WirelessDisconnect()");
+	    
+        bWirelessEnabled = false;
+        
+        bDisconnectWirelessFinished = false;
+        disconnectWirelessBgThread = new DisconnectWirelessBgThread();
+        disconnectWirelessBgThread.start();
+
+        while ( true )
+        {
+            try
+            {
+                Thread.sleep(333);
+            }
+            catch (InterruptedException ie)
+            {
+            }
+        
+            if ( bDisconnectWirelessFinished )
+                break;
+        }
+        
+        if ( (sDeviceName != null) && (sDeviceName.length() > 0) )
+        {
+            int iLoc = sDeviceName.indexOf(":");
+            if ( iLoc != -1 )
+            {
+                // Disconnected, so prevent it
+                // from using wireless Id with '-s'..
+                sDeviceName = "";
+            }
+        }
+
+        //completeLatch = new CountDownLatch(1);
+        
+        bDevicesFinished = false;
+        getDevicesBgThread = new GetDevicesBgThread();
+        getDevicesBgThread.start();
+        
+        while ( true )
+        {
+            try
+            {
+                Thread.sleep(333);   
+            }
+            catch (InterruptedException ie)
+            {
+            }
+            
+            if ( bDevicesFinished )
+                break;
+        }
+        
+/*        
+        try
+        {
+            completeLatch.await();
+        }
+        catch (InterruptedException ie)
+        {
+        }
+/**/
+
+        if ( (DevicesAr != null) && (DevicesAr.size() > 1) )
+        {
+            // Open Dialog..
+            selectDeviceDialog();
+        }
+        else
+        {
+            // Clear status bar..
+            deviceLabel.setText(" ");
+        }
+
+        // Reset..        
+        SingletonClass sc = SingletonClass.getInstance();
+        sc.s_WirelessConnected = false;
+
+	    
+	    //System.out.println("Exiting WirelessDisconnect()");
+	}    //}}}
 	
 	//{{{	InitWirelessBgThread
 	class InitWirelessBgThread extends Thread
@@ -2592,10 +2683,17 @@ public class ADB_Util
 
 			boolean bOK = false;
 			
-			// Check devices..
+			
 			bOK = false;
 			internalSb = new StringBuffer();
 			
+/*			
+			if ( androidSdkPathS == null )
+			    System.out.println("androidSdkPathS null");
+			else
+			    System.out.println("androidSdkPathS: "+androidSdkPathS);
+/**/
+
 			if ( iOS == LINUX_MAC )
 			{
 				internalSb.append("export PATH=${PATH}:");
@@ -2614,8 +2712,10 @@ public class ADB_Util
 				internalSb.append("&&adb devices");
 				internalSb.append("\n");
 			}
+			
+			//System.out.println("internalSb: "+internalSb.toString());
 
-			bCommandFinished = false;
+			bInternalFinished = false;		
 			sInternalCommand = internalSb.toString();
 			commandBgThread = new CommandBgThread();
 			commandBgThread.start();
@@ -2631,20 +2731,20 @@ public class ADB_Util
 				{
 				}
 
-				if ( bCommandFinished )
+				if ( bInternalFinished )
 					break;
 			}
-
+			
 			// Mix:
 			// YT910A2GPY      device
 			// emulator-5554   device
-/*
+/*			
 			if ( commandResultS == null )
-				System.out.println("commandResultS null");
+				System.out.println("(Devices)commandResultS null");
 			else
-				System.out.println("commandResultS: '"+commandResultS+"'");
+				System.out.println("(Devices)commandResultS: '"+commandResultS+"'");
 /**/
-			
+
 			if ( (commandResultS != null) && (commandResultS.length() > 0) )
 			{
 				iIndex = 0;
@@ -2663,8 +2763,12 @@ public class ADB_Util
 							
 							for ( ; ! Character.isWhitespace(commandResultS.charAt(iLoc3)); iLoc3-- );
 							iStart = iLoc3 + 1;
-							sDevName = commandResultS.substring(iStart, iEnd);
-							sDevName = sDevName.trim();
+							if ( (iStart >= 0) && (iEnd < commandResultS.length()) )
+							{
+                                sDevName = commandResultS.substring(iStart, iEnd);
+                                sDevName = sDevName.trim();
+                            }
+                            
 							//System.out.println("sDevName: '"+sDevName+"'");
 							
 							if ( sDevName.startsWith("emulator") )
@@ -2703,6 +2807,13 @@ public class ADB_Util
 			if ( bOK )
 			{
 				bOK = false;
+/*				
+				if ( DevicesAr != null )
+				{
+				    for ( int iX = 0; iX < DevicesAr.size(); iX++ )
+				        System.out.println("(DevicesAr)["+iX+"]: "+(String)DevicesAr.get(iX));
+				}
+/**/				
 				
 				if ( (ConnectDevicesAr != null) && (ConnectDevicesAr.size() > 0) )
 				{
@@ -2720,22 +2831,35 @@ public class ADB_Util
 						// put up Select Dialog..
 						iSelectMode = SELECT_CONNECT;
 						bSelectFinished = false;
-						selectDeviceDialog();
 						
-						// Wait for selection..
-						while ( true )
-						{
-							try
-							{
-								Thread.sleep(200);
-							}
-							catch (InterruptedException ie)
-							{
-							}
-			
-							if ( bSelectFinished )
-								break;
-						}
+                        if ( (DevicesAr	!= null) && (DevicesAr.size() > 0) )
+                        {
+                            if ( DevicesAr.size() > 1 )
+                            {
+                                // Open Dialog..
+                                selectDeviceDialog();
+                                
+                                // Wait for selection..
+                                while ( true )
+                                {
+                                    try
+                                    {
+                                        Thread.sleep(200);
+                                    }
+                                    catch (InterruptedException ie)
+                                    {
+                                    }
+                    
+                                    if ( bSelectFinished )
+                                        break;
+                                }
+                            }
+                            else
+                            {
+                                // Single device, show it..
+                                deviceLabel.setText((String)DevicesAr.get(0));
+                            }
+                        }
 					}
 /*					
 					if ( sDeviceName == null )
@@ -2748,6 +2872,7 @@ public class ADB_Util
 				
 				// Get IP address..
 				// Check if we have it..
+				
 				if ( (sDeviceIPAddress != null) && (sDeviceIPAddress.length() > 0) )
 				{
 					// Construct Wireless Id..
@@ -2756,6 +2881,7 @@ public class ADB_Util
 					wIdSb.append(sDeviceIPAddress);
 					wIdSb.append(":5555");
 					sWirelessID = wIdSb.toString();
+					//System.out.println("sWirelessID: '"+sWirelessID+"'");
 					bOK = true;
 				}
 				else
@@ -2783,12 +2909,11 @@ public class ADB_Util
 						internalSb.append(sDeviceName);
 						internalSb.append(" shell ip addr");
 						internalSb.append("\n");
-
 					}
 			
 					//System.out.println("internalSb: '"+internalSb.toString()+"'");
 					
-					bCommandFinished = false;		
+					bInternalFinished = false;		
 					sInternalCommand = internalSb.toString();
 					commandBgThread = new CommandBgThread();
 					commandBgThread.start();
@@ -2804,7 +2929,7 @@ public class ADB_Util
 						{
 						}
 		
-						if ( bCommandFinished )
+						if ( bInternalFinished )
 							break;
 					}
 
@@ -2849,7 +2974,8 @@ public class ADB_Util
 										{
 											iEnd = iLoc2;
 											iStart = iLoc2 - 3;
-											sT = commandResultS.substring(iStart, iEnd);
+											if ( (iStart >= 0) && (iEnd < commandResultS.length()) )
+											    sT = commandResultS.substring(iStart, iEnd);
 											//System.out.println("sT: '"+sT+"'");
 											if ( sT.equals("127") )
 												;
@@ -2860,7 +2986,8 @@ public class ADB_Util
 												
 												// Construct Wireless Id..
 												wIdSb = new StringBuffer();
-												wIdSb.append(commandResultS.substring(iStart, iEnd));
+												if ( (iStart >= 0) && (iEnd < commandResultS.length()) )
+												    wIdSb.append(commandResultS.substring(iStart, iEnd));
 												wIdSb.append(":5555");
 												sWirelessID = wIdSb.toString();
 												//System.out.println("sWirelessID: '"+sWirelessID+"'");
@@ -2936,7 +3063,7 @@ public class ADB_Util
 				
 				//System.out.println("internalSb: '"+internalSb.toString()+"'");
 	
-				bCommandFinished = false;		
+				bInternalFinished = false;		
 				sInternalCommand = internalSb.toString();
 				commandBgThread = new CommandBgThread();
 				commandBgThread.start();
@@ -2952,16 +3079,9 @@ public class ADB_Util
 					{
 					}
 	
-					if ( bCommandFinished )
+					if ( bInternalFinished )
 						break;
 				}
-
-/*				
-				if ( commandResultS == null )
-					System.out.println("commandResultS null");
-				else
-					System.out.println("commandResultS: '"+commandResultS+"'");
-/**/
 
 /*
 				if ( commandResultS != null )
@@ -2996,8 +3116,9 @@ public class ADB_Util
 				iWirelessErrorCode = 1;
 				sWirelessMessage = "Error: No device found.";
 			}
-			
+
 			bInitWirelessFinished = true;
+			
 			//System.out.println("Exiting InitWirelessBgThread run()");
 		}
 	}	//}}}
@@ -3007,6 +3128,7 @@ public class ADB_Util
 	{
 		public void run()
 		{
+		    //System.out.println("");
 			//System.out.println("ConnectWirelessBgThread run()");
 			StringBuffer internalSb = new StringBuffer();
 			StringBuffer wIdSb;
@@ -3016,7 +3138,44 @@ public class ADB_Util
 			int iLoc2;
 			boolean bOK;
 			iWirelessErrorCode = 0;
-/*			
+
+			// Check if it was connected..
+			SingletonClass sc = SingletonClass.getInstance();
+			
+            //System.out.println("sc.s_WirelessConnected: "+sc.s_WirelessConnected);			
+			if ( sc.s_WirelessConnected )
+            {
+                //System.out.println("\nTrying to Disconnect");
+                // Try to disconnect..
+				bDisconnectWirelessFinished = false;
+				disconnectWirelessBgThread = new DisconnectWirelessBgThread();
+				disconnectWirelessBgThread.start();
+
+				while ( true )
+				{
+					try
+					{
+						Thread.sleep(333);
+					}
+					catch (InterruptedException ie)
+					{
+					}
+				
+					if ( bDisconnectWirelessFinished )
+						break;
+				}
+				
+				sWirelessID = "";
+				
+				// After the Disconnect the 'sWirelessID' should
+				// be invalid..
+				
+            }
+
+            // Note:
+            // After Disconnect the sWirelessID shouldn't be valid..
+
+/* 
 			if ( sWirelessID == null )
 				System.out.println("sWirelessID null");
 			else
@@ -3078,9 +3237,9 @@ public class ADB_Util
 					internalSb.append(mSb.toString());
 				}
 		
-				//System.out.println("internalSb: '"+internalSb.toString()+"'");
+				//System.out.println("(Connect command)internalSb: '"+internalSb.toString()+"'");
 				
-				bCommandFinished = false;		
+				bInternalFinished = false;		
 				sInternalCommand = internalSb.toString();
 				commandBgThread = new CommandBgThread();
 				commandBgThread.start();
@@ -3095,45 +3254,39 @@ public class ADB_Util
 					catch (InterruptedException ie)
 					{
 					}
-	
-					//Thread.yield();
 		
-					if ( bCommandFinished )
+					if ( bInternalFinished )
 						break;
 				}
 				
 				bOK = false;
+
 /*				
 				if ( commandResultS == null )
-					System.out.println("commandResultS null");
+					System.out.println("(Connect)commandResultS null");
 				else
-					System.out.println("commandResultS: '"+commandResultS+"'");
+					System.out.println("(Connect)commandResultS: '"+commandResultS+"'");
 /**/
 
 				if ( (commandResultS != null) && (commandResultS.length() > 0) )
 				{
+				    //System.out.println("Found connected to");
 					iLoc1 = commandResultS.indexOf("connected to");
 					if ( iLoc1 != -1 )
 					{
 						// Success..
 						// Set to use 'sWirelessID' as the new device name for -s..
 						sDeviceName = sWirelessID;
-						//System.out.println("sDeviceName: '"+sDeviceName+"'");
+						System.out.println("sDeviceName: '"+sDeviceName+"'");
 						
-/*						
-						if ( (DevicesAr != null) && (DevicesAr.size() > 1) )
-						{
-							// Update status bar..
-							deviceLabel.setText(sDeviceName);
-						}
-/**/						
-						bWirelessConnected = true;	// Signal connected..
 						bOK = true;
 					}
 					
+					//System.out.println("bOK: "+bOK);
 					if ( bOK )
 					{
 						// Success..
+                        sc.s_WirelessConnected = true;
 					}
 					else
 					{
@@ -3144,11 +3297,12 @@ public class ADB_Util
 					}
 				}
 			}
+			
 /*			
 			if ( sDeviceName == null )
-				System.out.println("sDeviceName null");
+				System.out.println("(A)sDeviceName null");
 			else
-				System.out.println("sDeviceName: '"+sDeviceName+"'");
+				System.out.println("(A)sDeviceName: '"+sDeviceName+"'");
 /**/
 
 			if ( (sDeviceName != null) && (sDeviceName.length() > 0) )
@@ -3156,9 +3310,12 @@ public class ADB_Util
 			else
 				deviceLabel.setText(" ");
 				
-            //System.out.println("Exiting ConnectWirelessBgThread");				
-			//bConnectWirelessFinished = true;
-			completeLatch.countDown();
+				
+			bConnectWirelessFinished = true;
+			//completeLatch.countDown();
+			
+			//System.out.println("Exiting ConnectWirelessBgThread");
+			
 		}
 	}	//}}}
 			
@@ -3167,9 +3324,12 @@ public class ADB_Util
 	{
 		public void run()
 		{
+		    //System.out.println("\n");
 			//System.out.println("DisconnectWirelessBgThread run()");
 			StringBuffer internalSb = new StringBuffer();
 
+			//
+			// Do 'adb disconnect'..
 			if ( (sWirelessID != null) && (sWirelessID.length() > 0) )
 			{
 				if ( iOS == LINUX_MAC )
@@ -3180,7 +3340,6 @@ public class ADB_Util
 
 					internalSb.append(";adb disconnect ");
 					internalSb.append(sWirelessID);
-					internalSb.append(";adb usb");	// No device/Id options for 'usb'..
 				}
 				else
 				{
@@ -3189,13 +3348,17 @@ public class ADB_Util
 					internalSb.append("/platform-tools");
 					internalSb.append(";%PATH%");
 
+					// Note:
+					// We should wait some before
+					// we call 'adb usb'..
 					internalSb.append("&&adb disconnect ");
 					internalSb.append(sWirelessID);
-					internalSb.append("&&adb usb");	// No device/Id options for 'usb'..
 					internalSb.append("\n");
 				}
+				
+				//System.out.println("(adb disconnect)internalSb: "+internalSb.toString());    // Very long output
 		
-				bCommandFinished = false;		
+				bInternalFinished = false;		
 				sInternalCommand = internalSb.toString();
 				commandBgThread = new CommandBgThread();
 				commandBgThread.start();
@@ -3205,19 +3368,33 @@ public class ADB_Util
 				{
 					try
 					{
-						Thread.sleep(100);
+						//Thread.sleep(150);
+						Thread.sleep(333);
 					}
 					catch (InterruptedException ie)
 					{
 					}
 		
-					if ( bCommandFinished )
+					if ( bInternalFinished )
 						break;
 				}
+				
+				//System.out.println("(commandBgThread): "+g_sT);
+
+				// Note:
+				// Since this is just to Disconnect,
+				// once it does we shouldn't need to do an 'adb usb'..
+				
 			}
 
-			bWirelessConnected = false;	// Reset..
+			SingletonClass sc = SingletonClass.getInstance();
+			
+			// Disconnect reset..
+			sc.s_WirelessConnected = false;    // Reset..
 			bDisconnectWirelessFinished = true;
+			
+			//System.out.println("Exiting DisconnectWirelessBgThread");
+			
 		}
 	}	//}}}
 
@@ -3572,7 +3749,7 @@ public class ADB_Util
 	{
 		public void run()
 		{
-			//System.out.println("\nCommandBgThread run()");
+			//System.out.println("CommandBgThread run()");
 			//System.out.println("sInternalCommand: '"+sInternalCommand+"'");
 			
 			// ==================
@@ -3750,11 +3927,12 @@ public class ADB_Util
 /**/			
 
 			bCommandFinished = true;
+			bInternalFinished = true;
 			
 			//System.out.println("Exiting CommandBgThread run()");
 
-			if (commandRequestLatch != null)
-				commandRequestLatch.countDown();
+			//if (commandRequestLatch != null)
+				//commandRequestLatch.countDown();
 			
 			// ==================
 			// THREAD MUTEX
@@ -4076,7 +4254,8 @@ public class ADB_Util
         {
             try
             {
-                Thread.sleep(250);
+                //Thread.sleep(250);
+                Thread.sleep(500);
             }
             catch (InterruptedException ie)
             {
@@ -4085,8 +4264,8 @@ public class ADB_Util
             if ( bUpdateFileBrowserFinished )
                 break;
         }
-        
-/*
+
+/*        
         if ( fileToksAr == null )
             System.out.println("fileToksAr null");
         else
@@ -4207,7 +4386,6 @@ public class ADB_Util
         }
 
         JScrollPane scrollPane = new JScrollPane();
-        
 /*        
         if ( listSa == null )
             System.out.println("listSa null");
@@ -5979,45 +6157,64 @@ public class ADB_Util
 			}
 			else if ( WIRELESS_CONNECT.equals(sActionCommand) )
 			{
-				//System.out.println("WIRELESS_CONNECT");
-			    SingletonClass sc = SingletonClass.getInstance();
-			    if ( sc.bConnected == false )
-			        return;
+			    System.out.println("");
+				System.out.println("WIRELESS_CONNECT");
 				
 				bWirelessEnabled = true;
 
 				//System.out.println("bWirelessConnected: "+bWirelessConnected);
-				if ( bWirelessConnected )
-					;
-				else
-				{
+				SingletonClass sc = SingletonClass.getInstance();
 				
-					bInitWirelessFinished = false;
-					initWirelessBgThread = new InitWirelessBgThread();
-					initWirelessBgThread.start();
-	
-					while ( true )
-					{
-						try
-						{
-							Thread.sleep(20);
-						}
-						catch (InterruptedException ie)
-						{
-						}
-					
-						if ( bInitWirelessFinished )
-							break;
-					}
+				System.out.println("sc.s_WirelessConnected: "+sc.s_WirelessConnected);
+				if ( sc.s_WirelessConnected )
+				{
+				    // There was a previous connection, disconnect..
+				    WirelessDisconnect();
+				    
+				    try
+				    {
+				         Thread.sleep(2500);   
+				    }
+				    catch (InterruptedException ie)
+				    {
+				    }
 				}
+
+				
+                bInitWirelessFinished = false;
+                initWirelessBgThread = new InitWirelessBgThread();
+                initWirelessBgThread.start();
+
+                while ( true )
+                {
+                    try
+                    {
+                        Thread.sleep(20);
+                    }
+                    catch (InterruptedException ie)
+                    {
+                    }
+                
+                    if ( bInitWirelessFinished )
+                        break;
+                }
 				
 				// Check success..
-				if ( (iWirelessErrorCode == 0) || bWirelessConnected )
+				
+				System.out.println("iWirelessErrorCode: "+iWirelessErrorCode);
+				System.out.println("sc.s_WirelessConnected: "+sc.s_WirelessConnected);
+				
+				if ( (iWirelessErrorCode == 0) || sc.s_WirelessConnected )
 				{
-					if ( bWirelessConnected )
+					if ( sc.s_WirelessConnected )
+					{
+					    //System.out.println("sc.s_WirelessConnected true so don't need Dialog");
 						;
+					}
 					else
 					{
+					    // When the selection is changed, setValue is invoked, which generates a PropertyChangeEvent.
+					    
 						// Success, put up dialog for Connect..
 						JOptionPane.showMessageDialog(
 							null,				// parentComponent 
@@ -6026,12 +6223,29 @@ public class ADB_Util
 							JOptionPane.INFORMATION_MESSAGE);	// messageType
 					}
 					
-					//bConnectWirelessFinished = false;
-					completeLatch = new CountDownLatch(1);
+					// We should use a PropertyChangeListener,
+					// but for now we'll let it wait..
 					
+					//completeLatch = new CountDownLatch(1);
+					bConnectWirelessFinished = false;
 					connectWirelessBgThread = new ConnectWirelessBgThread();
 					connectWirelessBgThread.start();
-
+					
+					while ( true )
+					{
+					    try
+					    {
+					        Thread.sleep(333);
+					    }
+					    catch (InterruptedException ie)
+					    {
+					    }
+					    
+					    if ( bConnectWirelessFinished )
+					        break;
+					}
+					
+/*
 					try
 					{
 						completeLatch.await();
@@ -6039,22 +6253,7 @@ public class ADB_Util
 					catch (InterruptedException ie)
 					{
 					}
-
-/*
-					while ( true )
-					{
-						try
-						{
-							Thread.sleep(200);
-						}
-						catch (InterruptedException ie)
-						{
-						}
-					
-						if ( bConnectWirelessFinished )
-							break;
-					}
-/**/
+/**/					
 				}
 
 				int iMessageType;
@@ -6068,80 +6267,16 @@ public class ADB_Util
 						"Wireless",			// title
 						iMessageType);	// messageType
 				}
-				
-				//System.out.println("Exiting WIRELESS_CONNECT");
+/**/
+
+				System.out.println("Exiting WIRELESS_CONNECT");
 						
 			}
 			else if ( WIRELESS_DISCONNECT.equals(sActionCommand) )
 			{
 				//System.out.println("WIRELESS_DISCONNECT");
-			    SingletonClass sc = SingletonClass.getInstance();
-			    if ( sc.bConnected == false )
-			        return;
 				
-				bWirelessEnabled = false;
-				
-				bDisconnectWirelessFinished = false;
-				disconnectWirelessBgThread = new DisconnectWirelessBgThread();
-				disconnectWirelessBgThread.start();
-
-				while ( true )
-				{
-					try
-					{
-						Thread.sleep(20);
-					}
-					catch (InterruptedException ie)
-					{
-					}
-				
-					if ( bDisconnectWirelessFinished )
-						break;
-				}
-				
-				if ( (sDeviceName != null) && (sDeviceName.length() > 0) )
-				{
-					iLoc = sDeviceName.indexOf(":");
-					if ( iLoc != -1 )
-					{
-						// Disconnected, so prevent it
-						// from using wireless Id with '-s'..
-						sDeviceName = "";
-					}
-				}
-
-				bDevicesFinished = false;
-				//completeLatch = new CountDownLatch(1);
-				
-				getDevicesBgThread = new GetDevicesBgThread();
-				getDevicesBgThread.start();
-
-                while ( true )
-                {
-                    try
-                    {
-                        //completeLatch.await();
-                        Thread.sleep(350);
-                    }
-                    catch (InterruptedException ie)
-                    {
-                    }
-                    
-                    if ( bDevicesFinished )
-                        break;
-                }
-
-
-				if ( (DevicesAr != null) && (DevicesAr.size() > 1) )
-				{
-					// Open Dialog..
-					selectDeviceDialog();
-				}
-				else
-				{
-					// Clear status bar..
-					deviceLabel.setText(" ");
-				}
+				WirelessDisconnect();
 				
 			}
 			else if ( PULL_FILE.equals(sActionCommand) )
@@ -6151,6 +6286,8 @@ public class ADB_Util
 			    //System.out.println("sc.bConnected: "+sc.bConnected);
 			    if ( sc.bConnected == false )
 			        return;
+			    //else
+			        //System.out.println("OK");
 			    
 			    sSelectedMenu = "Pull file";
 			    

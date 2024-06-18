@@ -7,7 +7,7 @@ ADB_Util
     'screenshot_dir' and 'camera_dir' to what works for your device.
     You can make changes to config.properties without needing to restart ADB_Util.
     
-    For 'Apk->Install apk' you must have 'Unknown sources' turned on in Security.
+    For 'Apk->Install apk' you must have 'Unknown sources' enabled in Security.
 
     ** Note **
     After you do "Reboot" or "Reboot to Recovery" it will lose any Device Id,
@@ -70,10 +70,6 @@ Wireless:
 Release notes:
         
     
-    ADB_Util 1.2.0:
-        Improved logcat.  Now uses 'brief' option for more compact output and
-        allow highlighting to work on newer devices.
-    
     ADB_Util 1.2.2:
         It will now figure out the paths for 'Camera' and 'Screenshots'.
         Improved navigation.  If the file path ends with 'emulated' it will add '/0'
@@ -85,6 +81,9 @@ Release notes:
         Greatly improved file browsing.
         It will now automatically use the directories symlink if available.
         
-        
+    ADB_Util 1.2.6:
+        Fixed and improved Wireless connect/disconnect.
+    
+    
    joes0451@outlook.com
         
