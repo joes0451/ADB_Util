@@ -358,7 +358,7 @@ public class ADB_Util
             try
             {
                 //completeLatch.await();
-                Thread.sleep(350);
+                Thread.sleep(333);
             }
             catch (InterruptedException ie)
             {
@@ -745,7 +745,7 @@ public class ADB_Util
 	{
 		public void run()
 		{
-			//System.out.println("\nIOBgThread run()");
+			//System.out.println("IOBgThread run()");
 			Process proc = null;			
 			OutputStream os = null;
 			
@@ -1115,7 +1115,7 @@ public class ADB_Util
                                     {
                                         try
                                         {
-                                            Thread.sleep(20);
+                                            Thread.sleep(333);
                                         }
                                         catch (InterruptedException ie)
                                         {
@@ -1730,7 +1730,7 @@ public class ADB_Util
 			bLogcatOn = false;
 			bFinished = true;
 
-			//System.out.println("\nExiting IOBgThread run()");
+			//System.out.println("Exiting IOBgThread run()");
 		}
 	}	//}}}
 
@@ -1770,7 +1770,7 @@ public class ADB_Util
 	{
 		public void run()
 		{
-			//System.out.println("\nUpdateFileBrowserBgThread run()");
+			//System.out.println("UpdateFileBrowserBgThread run()");
 			
 			StringTokenizer st;
             StringBuffer sb = new StringBuffer();
@@ -1857,7 +1857,7 @@ public class ADB_Util
             {
                 try
                 {
-                    Thread.sleep(150);
+                    Thread.sleep(333);
                 }
                 catch (InterruptedException ie)
                 {
@@ -1872,7 +1872,7 @@ public class ADB_Util
                 System.out.println("commandResultS null");
             else
             {
-                System.out.println("\n============================================");
+                System.out.println("============================================");
                 System.out.println("commandResultS: '"+commandResultS+"'");
                 //System.out.println("commandResultS.length(): "+commandResultS.length());
             }
@@ -2194,7 +2194,7 @@ public class ADB_Util
 	{
 		public void run()
 		{
-			//System.out.println("\nGetDevicesBgThread run()");
+			//System.out.println("GetDevicesBgThread run()");
 			int iLoc;
 			int iLoc2;
 			int iLoc3;
@@ -2245,7 +2245,7 @@ public class ADB_Util
 			{
 				try
 				{
-					Thread.sleep(350);
+					Thread.sleep(333);
 				}
 				catch (InterruptedException ie)
 				{
@@ -2269,6 +2269,7 @@ public class ADB_Util
             }
             System.out.println();
 /**/
+
 
 /*
 			if ( commandResultS == null )
@@ -2397,7 +2398,7 @@ public class ADB_Util
             {
                 try
                 {
-                    Thread.sleep(150);
+                    Thread.sleep(333);
                 }
                 catch (InterruptedException ie)
                 {
@@ -2440,7 +2441,7 @@ public class ADB_Util
             {
                 try
                 {
-                    Thread.sleep(150);
+                    Thread.sleep(333);
                 }
                 catch (InterruptedException ie)
                 {
@@ -2504,7 +2505,7 @@ public class ADB_Util
                 {
                     try
                     {
-                        Thread.sleep(150);
+                        Thread.sleep(333);
                     }
                     catch (InterruptedException ie)
                     {
@@ -2531,7 +2532,7 @@ public class ADB_Util
                     {
                         try
                         {
-                            Thread.sleep(150);
+                            Thread.sleep(333);
                         }
                         catch (InterruptedException ie)
                         {
@@ -2725,7 +2726,7 @@ public class ADB_Util
 			{
 				try
 				{
-					Thread.sleep(200);
+					Thread.sleep(333);
 				}
 				catch (InterruptedException ie)
 				{
@@ -2844,7 +2845,7 @@ public class ADB_Util
                                 {
                                     try
                                     {
-                                        Thread.sleep(200);
+                                        Thread.sleep(333);
                                     }
                                     catch (InterruptedException ie)
                                     {
@@ -2923,7 +2924,7 @@ public class ADB_Util
 					{
 						try
 						{
-							Thread.sleep(200);
+							Thread.sleep(333);
 						}
 						catch (InterruptedException ie)
 						{
@@ -3073,7 +3074,7 @@ public class ADB_Util
 				{
 					try
 					{
-						Thread.sleep(200);
+						Thread.sleep(333);
 					}
 					catch (InterruptedException ie)
 					{
@@ -3249,7 +3250,7 @@ public class ADB_Util
 				{
 					try
 					{
-						Thread.sleep(500);
+						Thread.sleep(333);
 					}
 					catch (InterruptedException ie)
 					{
@@ -3452,7 +3453,7 @@ public class ADB_Util
 			{
 				try
 				{
-					Thread.sleep(150);
+					Thread.sleep(333);
 				}
 				catch (InterruptedException ie)
 				{
@@ -3543,7 +3544,7 @@ public class ADB_Util
 			{
 				try
 				{
-					Thread.sleep(150);
+					Thread.sleep(333);
 				}
 				catch (InterruptedException ie)
 				{
@@ -3593,7 +3594,7 @@ public class ADB_Util
         {
             try
             {
-                Thread.sleep(250);
+                Thread.sleep(333);
             }
             catch (InterruptedException ie)
             {
@@ -4255,7 +4256,7 @@ public class ADB_Util
             try
             {
                 //Thread.sleep(250);
-                Thread.sleep(500);
+                Thread.sleep(333);
             }
             catch (InterruptedException ie)
             {
@@ -4619,7 +4620,7 @@ public class ADB_Util
                     {
                         try
                         {
-                            Thread.sleep(100);
+                            Thread.sleep(333);
                         }
                         catch (InterruptedException ie)
                         {
@@ -4793,7 +4794,7 @@ public class ADB_Util
                 {
                     try
                     {
-                        Thread.sleep(250);
+                        Thread.sleep(333);
                     }
                     catch (InterruptedException ie)
                     {
@@ -4857,7 +4858,7 @@ public class ADB_Util
                     {
                         try
                         {
-                            Thread.sleep(100);
+                            Thread.sleep(333);
                         }
                         catch (InterruptedException ie)
                         {
@@ -4943,7 +4944,7 @@ public class ADB_Util
                         {
                             try
                             {
-                                Thread.sleep(150);
+                                Thread.sleep(333);
                             }
                             catch (InterruptedException ie)
                             {
@@ -4976,7 +4977,7 @@ public class ADB_Util
                     {
                         try
                         {
-                            Thread.sleep(100);
+                            Thread.sleep(333);
                         }
                         catch (InterruptedException ie)
                         {
@@ -5089,7 +5090,7 @@ public class ADB_Util
                     {
                         try
                         {
-                            Thread.sleep(100);
+                            Thread.sleep(333);
                         }
                         catch (InterruptedException ie)
                         {
@@ -5221,7 +5222,7 @@ public class ADB_Util
                 {
                     try
                     {
-                        Thread.sleep(250);
+                        Thread.sleep(333);
                     }
                     catch (InterruptedException ie)
                     {
@@ -5283,7 +5284,7 @@ public class ADB_Util
                 {
                     try
                     {
-                        Thread.sleep(20);
+                        Thread.sleep(333);
                     }
                     catch (InterruptedException ie)
                     {
@@ -5428,7 +5429,7 @@ public class ADB_Util
                 {
                     try
                     {
-                        Thread.sleep(250);
+                        Thread.sleep(333);
                     }
                     catch (InterruptedException ie)
                     {
@@ -5473,7 +5474,7 @@ public class ADB_Util
                     {
                         try
                         {
-                            Thread.sleep(100);
+                            Thread.sleep(333);
                         }
                         catch (InterruptedException ie)
                         {
@@ -5564,7 +5565,7 @@ public class ADB_Util
                         {
                             try
                             {
-                                Thread.sleep(150);
+                                Thread.sleep(333);
                             }
                             catch (InterruptedException ie)
                             {
@@ -5599,7 +5600,7 @@ public class ADB_Util
                         //Thread.yield();
                         try
                         {
-                            Thread.sleep(100);
+                            Thread.sleep(333);
                         }
                         catch (InterruptedException ie)
                         {
@@ -5726,7 +5727,7 @@ public class ADB_Util
                 {
                     try
                     {
-                        Thread.sleep(250);
+                        Thread.sleep(333);
                     }
                     catch (InterruptedException ie)
                     {
@@ -5782,7 +5783,7 @@ public class ADB_Util
                 {
                     try
                     {
-                        Thread.sleep(150);
+                        Thread.sleep(333);
                     }
                     catch (InterruptedException ie)
                     {
@@ -5803,7 +5804,7 @@ public class ADB_Util
                     {
                         try
                         {
-                            Thread.sleep(150);
+                            Thread.sleep(333);
                         }
                         catch (InterruptedException ie)
                         {
@@ -5974,7 +5975,7 @@ public class ADB_Util
                     {
                         try
                         {
-                            Thread.sleep(100);
+                            Thread.sleep(333);
                         }
                         catch (InterruptedException ie)
                         {
@@ -6015,6 +6016,8 @@ public class ADB_Util
 				
 				iOBgThread = new IOBgThread();
 				iOBgThread.start();
+				
+				
 			}
 			else if ( LOGCAT.equals(sActionCommand) )
 			{
@@ -6034,7 +6037,7 @@ public class ADB_Util
                     {
                         try
                         {
-                            Thread.sleep(100);
+                            Thread.sleep(333);
                         }
                         catch (InterruptedException ie)
                         {
@@ -6189,7 +6192,7 @@ public class ADB_Util
                 {
                     try
                     {
-                        Thread.sleep(20);
+                        Thread.sleep(333);
                     }
                     catch (InterruptedException ie)
                     {
@@ -6619,7 +6622,7 @@ public class ADB_Util
                         {
                             try
                             {
-                                Thread.sleep(150);
+                                Thread.sleep(333);
                             }
                             catch (InterruptedException ie)
                             {
@@ -6660,7 +6663,7 @@ public class ADB_Util
                         //Thread.yield();
                         try
                         {
-                            Thread.sleep(100);
+                            Thread.sleep(333);
                         }
                         catch (InterruptedException ie)
                         {
@@ -6715,7 +6718,7 @@ public class ADB_Util
                         {
                             try
                             {
-                                Thread.sleep(250);
+                                Thread.sleep(333);
                             }
                             catch (InterruptedException ie)
                             {

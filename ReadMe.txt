@@ -69,14 +69,6 @@ Wireless:
 
 Release notes:
         
-    
-    ADB_Util 1.2.2:
-        It will now figure out the paths for 'Camera' and 'Screenshots'.
-        Improved navigation.  If the file path ends with 'emulated' it will add '/0'
-        to prevent permission errors.
-        Improved File Dialog and operations.
-        Many other improvements.
-    
     ADB_Util 1.2.4:
         Greatly improved file browsing.
         It will now automatically use the directories symlink if available.
@@ -84,6 +76,8 @@ Release notes:
     ADB_Util 1.2.6:
         Fixed and improved Wireless connect/disconnect.
     
+    ADB_Util 1.2.7:
+        Improved timing.
     
    joes0451@outlook.com
         
