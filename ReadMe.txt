@@ -69,15 +69,14 @@ Wireless:
 
 Release notes:
         
-    ADB_Util 1.2.4:
-        Greatly improved file browsing.
-        It will now automatically use the directories symlink if available.
-        
     ADB_Util 1.2.6:
         Fixed and improved Wireless connect/disconnect.
     
     ADB_Util 1.2.7:
         Improved timing.
+        
+    ADB_Util 1.2.8: 
+        Improved Exception prevention.
     
    joes0451@outlook.com
         

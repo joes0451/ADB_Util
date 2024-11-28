@@ -1148,7 +1148,9 @@ public class ADB_Util
                                             for ( ; Character.isWhitespace(commandResultS.charAt(iLoc3)); iLoc3++ );
                                             iStart = iLoc3;
                                             for ( ; ! Character.isWhitespace(commandResultS.charAt(iLoc3)); iLoc3++ );
-                                            sPid = commandResultS.substring(iStart, iLoc3);
+                                            
+                                            if ( (iStart >= 0) && (iLoc3 < commandResultS.length()) )
+                                                sPid = commandResultS.substring(iStart, iLoc3);
                                             //System.out.println("sPid: '"+sPid+"'");
                                             
                                         }
@@ -1187,7 +1189,7 @@ public class ADB_Util
                                                 
                                                 endSb.append(sPrevEnd);
                                                 
-                                                if ( (iLoc2 + 1) > 0 )
+                                                if ( ((iLoc2 + 1) > 0) && ((iLoc2 + 1) < lineSb.length()) )
                                                 {
                                                     endSb.append(lineSb.substring(0, iLoc2 + 1));
                                                 }
@@ -1202,7 +1204,8 @@ public class ADB_Util
                                                     {
                                                         if ( (iLoc4 > 0) && (iLoc5 < iLoc4) )
                                                         {
-                                                            sT = endSb.substring(iLoc5 + 1, iLoc4);
+                                                            if ( (iLoc5 + 1 >= 0) && (iLoc4 < endSb.length()) )
+                                                                sT = endSb.substring(iLoc5 + 1, iLoc4);
                                                             sT = sT.trim();
                                                             if ( sPid.equals(sT) )
                                                             {
@@ -1225,7 +1228,8 @@ public class ADB_Util
                                                 {
                                                     // ' 1499): Scheduling ... ( ...
                                                     sT = "";
-                                                    if ( (iLoc4 > 0) && (iLoc5 < iLoc4) )
+                                                    if ( (iLoc4 > 0) && (iLoc5 < iLoc4) &&
+                                                            ((iLoc5 + 1) >= 0) && (iLoc4 < lineSb.length()) )
                                                         sT = lineSb.substring(iLoc5 + 1, iLoc4);
                                                     
                                                     sT = sT.trim();
@@ -1486,7 +1490,8 @@ public class ADB_Util
 											bSaveLen = false;	// Reset..
 											
 										iType = iCurrentType;
-										outLineS = lineSb.substring(iStart, iIndex);
+										if ( (iStart >= 0) && (iIndex < lineSb.length()) )
+										    outLineS = lineSb.substring(iStart, iIndex);
 									}
 									else
 									{
@@ -1538,7 +1543,8 @@ public class ADB_Util
 										
 										if ( bOver )
 										{
-											outLineS = lineSb.substring(iStart);
+										    if ( iStart < lineSb.length() )
+										        outLineS = lineSb.substring(iStart);
 											iCurrentType = iType;	// Save for next draw..
 											
 											if ( ! bHitTrailing )
@@ -1552,7 +1558,8 @@ public class ADB_Util
 										}
 										else
 										{
-											outLineS = lineSb.substring(iStart, iIndex);
+										    if ( (iStart >= 0) && (iIndex < lineSb.length()) )
+										        outLineS = lineSb.substring(iStart, iIndex);
 										}
 									}
 									
@@ -1910,7 +1917,7 @@ public class ADB_Util
                     // Go back one level..
                     // Like:  '/dev/rpipe'
                     iLoc = sCurrentPath.lastIndexOf("/");
-                    if ( iLoc != -1 )
+                    if ( (iLoc != -1) && (iLoc < sCurrentPath.length()) )
                     {
                         sCurrentPath = sCurrentPath.substring(0, iLoc);
                     }
@@ -2296,7 +2303,8 @@ public class ADB_Util
 							for ( ; ! Character.isWhitespace(commandResultS.charAt(iG)); iG-- );
 							iStart = iG + 1;
 							
-							sDevice = commandResultS.substring(iStart, iEnd);
+							if ( (iStart >= 0) && (iEnd < commandResultS.length()) )
+							    sDevice = commandResultS.substring(iStart, iEnd);
 							sDevice = sDevice.trim();
 							
 							//System.out.println("(ADD)sDevice: '"+sDevice+"'");
@@ -2417,7 +2425,8 @@ public class ADB_Util
                 iLoc3 = commandResultS.indexOf("/", (iLoc2 + 4));
                 if ( iLoc3 != -1 )
                 {
-                    sRootPath = commandResultS.substring((iLoc2 + 2), iLoc3);
+                    if ( ((iLoc2 + 2) >= 0) && (iLoc3 < commandResultS.length()) )
+                        sRootPath = commandResultS.substring((iLoc2 + 2), iLoc3);
                     sRootPath = sRootPath.trim();
                 }
             }
@@ -2766,7 +2775,8 @@ public class ADB_Util
 							iStart = iLoc3 + 1;
 							if ( (iStart >= 0) && (iEnd < commandResultS.length()) )
 							{
-                                sDevName = commandResultS.substring(iStart, iEnd);
+							    if ( (iStart >= 0) && (iEnd < commandResultS.length()) )
+							        sDevName = commandResultS.substring(iStart, iEnd);
                                 sDevName = sDevName.trim();
                             }
                             
@@ -3485,7 +3495,8 @@ public class ADB_Util
                             break;
                     }
                     
-                    sT = commandResultS.substring((iStart + 13), iLoc2);
+                    if ( ((iStart + 13) >= 0) && (iLoc2 < commandResultS.length()) )
+                        sT = commandResultS.substring((iStart + 13), iLoc2);
                     sT = sT.trim();
                     sWakefulness = sT;
                 }
@@ -3698,7 +3709,7 @@ public class ADB_Util
                     if ( sT != null )
                     {
                         iLoc = sT.indexOf("~");
-                        if ( iLoc != -1 )
+                        if ( (iLoc != -1) && (iLoc < sT.length()) )
                         {
                             sT = sT.substring(0, iLoc);
                         }
@@ -4289,7 +4300,7 @@ public class ADB_Util
                 if ( sT != null )
                 {
                     iLoc = sT.indexOf("~");
-                    if ( iLoc != -1 )
+                    if ( (iLoc != -1) && (iLoc < sT.length()) )
                     {
                         sT = sT.substring(0, iLoc);
                     }
@@ -4594,7 +4605,7 @@ public class ADB_Util
                     if ( iLoc != -1 )
                     {
                         iLoc2 = sCurrentPath.indexOf("/", iLoc + 1);
-                        if ( iLoc2 != -1 )
+                        if ( (iLoc2 != -1) && (iLoc2 < sCurrentPath.length()) )
                         {
                             sCurrentPath = sCurrentPath.substring(0, iLoc2);
                         }
@@ -5151,7 +5162,8 @@ public class ADB_Util
                             sT = sT.trim();
                             if ( sT.startsWith("adb") )
                             {
-                                sb.append(sT.substring(4));
+                                if ( 4 < sT.length() )
+                                    sb.append(sT.substring(4));
                             }
                         }
                     }
@@ -5328,7 +5340,9 @@ public class ADB_Util
                             if ( bOk )
                             {
                                 iLoc3 += 3;
-                                sT = commandResultS.substring(iLoc3, iLoc2);
+                                
+                                if ( (iLoc3 >= 0) && (iLoc2 < commandResultS.length()) )
+                                    sT = commandResultS.substring(iLoc3, iLoc2);
                                 //System.out.println("sT: '"+sT+"'");
                                 if ( (sT.startsWith("/")) ||
                                         (sT.contains(" ")) ||
@@ -5754,7 +5768,7 @@ public class ADB_Util
                     {
                         // Remove 'package:'
                         iLoc = sT.indexOf(":");
-                        if ( iLoc != -1 )
+                        if ( (iLoc != -1) && ((iLoc + 1) < sT.length()) )
                             tAr.add((String)sT.substring(iLoc + 1));
                     }
                 }
@@ -6363,7 +6377,7 @@ public class ADB_Util
 		                sT = (String)fileToksAr.get(iFileBrowserSelectedIndex);
 		                //System.out.println("sT: '"+sT+"'");
 		                iLoc = sT.indexOf("~");
-		                if ( iLoc != -1 )
+		                if ( (iLoc != -1) && ((iLoc + 1) < sT.length()) )
 		                {
 		                    sSymLinkPath = sT.substring(iLoc + 1);
 		                    if ( sSymLinkPath.startsWith("?") )
@@ -6862,7 +6876,7 @@ public class ADB_Util
 		                sT = (String)fileToksAr.get(iIndex);
 		                //System.out.println("sT: '"+sT+"'");
 		                iLoc = sT.indexOf("~");
-		                if ( iLoc != -1 )
+		                if ( (iLoc != -1) && ((iLoc + 1) < sT.length()) )
 		                {
 		                    sSymLinkPath = sT.substring(iLoc + 1);
 		                    if ( sSymLinkPath.startsWith("?") )
@@ -6884,8 +6898,9 @@ public class ADB_Util
 			        {
 			            // Strip off brackets..
 			            // '[sdcard]~/storage/self/primary'
-			            //          ^
-			            sT = sT.substring(1, iLoc - 1);
+			            //    
+			            if ( (iLoc - 1) < sT.length() )
+			                sT = sT.substring(1, iLoc - 1);
 			            //System.out.println("sT: '"+sT+"'");
 			            
 			            sB = new StringBuffer();
