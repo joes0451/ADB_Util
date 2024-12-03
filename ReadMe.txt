@@ -52,14 +52,14 @@ Wireless:
     Allows you to use adb wireless over Wi-Fi, no root required.
     You can optionally add your device's IP address in config.properties.
     If you lose your wireless connection you can reconnect by
-    selecting Wireless->Re/Connect.
+    selecting Wireless->Connect.
     
     - Attach your Android device to your computer with USB cable.
     
     - Wait for the indication that the OS has detected and connected with
     your device.
     
-    - Select Wireless->Re/Connect.
+    - Select Wireless->Connect.
     
     - After you see the Wireless Connect dialog, unplug your USB cable
     and hit 'OK'.
@@ -69,14 +69,17 @@ Wireless:
 
 Release notes:
         
-    ADB_Util 1.2.6:
-        Fixed and improved Wireless connect/disconnect.
-    
     ADB_Util 1.2.7:
         Improved timing.
         
     ADB_Util 1.2.8: 
         Improved Exception prevention.
+
+    ADB_Util 1.3.0:
+        Improved Logcat and Process Id Logcat.
+        New option, 'use_adb_pull_to_download', to use 'adb pull' to download to system
+        download directory, for 'Take screenshot' and 'Screen Record'.
+        Other improvements.
     
    joes0451@outlook.com
         

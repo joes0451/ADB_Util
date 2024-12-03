@@ -28,6 +28,7 @@ public class SingletonClass
     
     public String sSelectedFile;
     public String sPackageName;
+    public String s_sCommand;
     public boolean bConnected;
     public boolean s_WirelessConnected;
     

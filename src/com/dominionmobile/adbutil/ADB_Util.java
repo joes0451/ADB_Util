@@ -178,11 +178,11 @@ public class ADB_Util
     static volatile String sScreenRecordBitRate;
     static volatile String sScreenRecordVideoSize;
     static volatile String sScreenRecordShowVerbose;
-    static volatile String sShowPackageNameInStatusBar;
     static volatile String sWakefulness;
     static volatile String sSDcardPath;
     static volatile String sScreenshotPath;
     static volatile String sCameraPath;
+    static volatile String sUseAdbPullToDownload;
     private String internalCommandS;
     
     static volatile String[] tokSa;
@@ -215,6 +215,7 @@ public class ADB_Util
     static volatile int iSelectMode;
     static volatile int iButtonCount;
     static volatile int iFileBrowserSelectedIndex;
+    static volatile int iLoopCount;
     
     static volatile long lPrevTime;
     static volatile long lTimerEnd;
@@ -368,6 +369,13 @@ public class ADB_Util
                 break;
         }
 
+/*
+        if ( DevicesAr == null )
+            System.out.println("DevicesAr null");
+        else
+            System.out.println("DevicesAr.size(): "+DevicesAr.size());
+/**/        
+        
 		if ( (DevicesAr	!= null) && (DevicesAr.size() > 0) )
 		{
 			if ( DevicesAr.size() > 1 )
@@ -419,8 +427,9 @@ public class ADB_Util
                 sc.sPackageName = sT;
 			}
 			
+			sUseAdbPullToDownload = processPath(prop.getProperty("use_adb_pull_to_download"));
+			
 			sUsePidLogcat = processPath(prop.getProperty("use_pid_logcat"));
-			sShowPackageNameInStatusBar = processPath(prop.getProperty("show_package_name_in_status_bar"));
 			
 			logcatFilterS = processPath(prop.getProperty("logcat_filter"));
 			sDeviceIPAddress = processPath(prop.getProperty("device_ip_address"));
@@ -472,7 +481,8 @@ public class ADB_Util
 		devicesMenuItem.addActionListener(actListener);
 
 		JMenu wirelessSubMenu = new JMenu("Wireless");
-		JMenuItem wirelessSubMenuItem = new JMenuItem("Re/Connect");
+		//JMenuItem wirelessSubMenuItem = new JMenuItem("Re/Connect");
+		JMenuItem wirelessSubMenuItem = new JMenuItem("Connect");
 		wirelessSubMenuItem.setActionCommand("wireless_connect");
 		wirelessSubMenuItem.addActionListener(actListener);
 		wirelessSubMenu.add(wirelessSubMenuItem);
@@ -677,45 +687,8 @@ public class ADB_Util
 		statusBar.add(deviceLabel, gbc);
 		
 		iGridX++;
-
-		Properties prop = new Properties();
-
-		try
-		{
-			prop.load(new FileInputStream("config.properties"));
-			sShowPackageNameInStatusBar = processPath(prop.getProperty("show_package_name_in_status_bar"));		
-		}
-		catch (IOException ioe)
-		{
-			System.out.println("RefreshProperties() Exception");
-			ioe.printStackTrace();
-		}
 		
-/*		
-		if ( sShowPackageNameInStatusBar == null )
-		    System.out.println("sShowPackageNameInStatusBar null");
-		else
-		    System.out.println("sShowPackageNameInStatusBar: '"+sShowPackageNameInStatusBar+"'");
-/**/		
-		
-        if ( (sShowPackageNameInStatusBar != null) && (sShowPackageNameInStatusBar.equals("true")) )
-        {
-            
-            packageLabel = new JLabel(" ");
-            packageLabel.setBorder(loweredBevel);
-    
-            gbc = new GridBagConstraints();
-            gbc.fill = GridBagConstraints.HORIZONTAL;
-            gbc.anchor = GridBagConstraints.WEST;
-            gbc.gridx = iGridX;
-            gbc.weightx = 1.0;
-            gbc.insets = new Insets(2, 2, 2, 2); // top left bottom right
 
-            statusBar.add(packageLabel, gbc);
-            
-            iGridX++;
-        }
-		
 		statusPath = new JLabel(" ");			// <-- (Set)
 		statusPath.setBorder(loweredBevel);
 		gbc = new GridBagConstraints();
@@ -745,8 +718,11 @@ public class ADB_Util
 	{
 		public void run()
 		{
+		    //StringBuffer commandSb = null;
+		    
 			//System.out.println("IOBgThread run()");
-			Process proc = null;			
+			
+            Process proc = null;
 			OutputStream os = null;
 			
 			InputStream error_is = null;
@@ -754,12 +730,14 @@ public class ADB_Util
 			BufferedInputStream error_bis = null;
 			BufferedInputStream out_bis = null;
 			
-			ByteArrayOutputStream baos = new ByteArrayOutputStream();
-			byte[] writeBuf;
-			byte[] bZeroD = {(byte)0x0d};
-			String sZeroD = new String(bZeroD);
+			//char[] cAs = {'"', 'a', 'p', 'p', '.', 's', 't', 'a', 'r', 't', 'e', 'd', '"'};
+			//String sAppStarted = new String(cAs);
+			
 			byte[] bZeroA = {(byte)0x0a};
 			String sZeroA = new String(bZeroA);
+			
+			ByteArrayOutputStream baos = new ByteArrayOutputStream();
+			byte[] writeBuf;
 
 			int iBytesRead = 0;
 			int iCount;
@@ -767,12 +745,12 @@ public class ADB_Util
 			int iTotalBytes;
 			int iG;
 			int iLoc;
-			int iLoc2 = 0;
 			int iLoc3 = 0;
-			int iLoc4 = 0;
-			int iLoc5 = 0;
-			int iLoc6 = 0;
+			int iGotZeroCount = 0;
+			
+			
 			int iLen;
+			int iExitCount = 0;
 			int iLEnd = -1;
 			int iLenSave = 0;
 			int iCurrentType = NORMAL;
@@ -798,9 +776,7 @@ public class ADB_Util
 			int iChunkLen;
 			int iArrayIndex = 0;
 			int iPartialLength = 0;
-			int iBlockCount = 0;
-			int iBlkCount = 0;
-			int iLastZeroA = 0;
+			int iBlockCount = 0;	
 			int[] iBlock = new int[128];
 
 			char cChr;
@@ -821,30 +797,25 @@ public class ADB_Util
 			boolean bDoBreak = false;
 			boolean bBlockSplit = false;
 			boolean bStart;
-			boolean bFinishEnd = false;
-			boolean bFirst2;
+			boolean bEndBreakOut = false;
+			boolean bBreakOut = false;
 			
 			String outLineS;
+			String sEndOne = "";
+			String sEndTwo = "";
+			String sEndThree = "tools>";
 			String inLineS;
 			String lineS = "";
 			String outS;
-			String sT = "";
-			String sT2 = "";
-			String sPrevEnd = "";
-			StringBuffer sB = null;
-			StringBuffer endSb = null;
+			String sTest = "";
+			StringBuffer sb;
+			StringBuffer commandSb;
+			
+			long lCurrentTime;
+			long lDifCount = 0;
 			
 			
 			ArrayList locAr = new ArrayList(384);
-			
-            SingletonClass sc = SingletonClass.getInstance();
-            sPackageName = sc.sPackageName;
-/*            
-            if ( sPackageName == null )
-                System.out.println("sPackageName null");
-            else
-                System.out.println("sPackageName: '"+sPackageName+"'");
-/**/
 
 			// Note:
 			//
@@ -859,6 +830,17 @@ public class ADB_Util
 
 			//System.out.println("\n\n(IOBgThread)commandS: '"+commandS+"'");
 			//System.out.println("\nIOBgThread run()");
+
+			
+			SingletonClass sc = SingletonClass.getInstance();
+			
+/*			
+			if ( sc.s_sCommand == null )
+				System.out.println("sc.s_sCommand null");
+			else
+				System.out.println("sc.s_sCommand: '"+sc.s_sCommand+"'");
+/**/			
+			
 /*			
 			if ( commandS == null )
 				System.out.println("commandS null");
@@ -866,69 +848,73 @@ public class ADB_Util
 				System.out.println("commandS: '"+commandS+"'");
 /**/
 
+
+            //System.out.println("sUsePidLogcat: '"+sUsePidLogcat+"'");
+/*            
+            if ( packageNameS == null )
+                System.out.println("packageNameS null");
+            else
+                System.out.println("packageNameS: '"+packageNameS+"'");
+/**/
+
+            // Moved out of try..            
+			Runtime rt = Runtime.getRuntime();
+				
+
 			try
 			{
-				Runtime rt = Runtime.getRuntime();
+			    
+                //SingletonClass sc = SingletonClass.getInstance();
+				//Runtime rt = Runtime.getRuntime();
+				
+                //if ( rt == null )
+                    //System.out.println("rt null");
+				
 				
 				if ( iOS == LINUX_MAC )
 				{
-					proc = rt.exec(new String[] {"/bin/bash", "-c", commandS});
+					//proc = rt.exec(new String[] {"/bin/bash", "-c", commandS});
+					proc = rt.exec(new String[] {"/bin/bash", "-c", sc.s_sCommand});
 				}
 				else
 				{
 					proc = rt.exec("cmd.exe");
-					
-					writeBuf = commandS.getBytes();
+                    
+					//writeBuf = commandS.getBytes();
+					writeBuf = sc.s_sCommand.getBytes();
 					
 					// Command..				
 					os = proc.getOutputStream();
 					os.write(writeBuf);
 					os.flush();
 				}
-					
+
+                // Give time to execute..				
+				try
+				{
+				    Thread.sleep(500);
+				    //Thread.sleep(750);
+				    //Thread.sleep(1000);
+				}
+				catch (InterruptedException ie)
+				{
+				}
+
 				error_is = proc.getErrorStream();
 				out_is = proc.getInputStream();
 				
 				error_bis = new BufferedInputStream(error_is);
-				out_bis = new BufferedInputStream(out_is);	
+				out_bis = new BufferedInputStream(out_is);
 				
-				if ( iOS == WINDOWS )
-				{
-					StringBuffer tSb = new StringBuffer();
-
-					// Get current directory prompt..
-					StringBuffer currDirSb = new StringBuffer();
-					String currDirS = System.getProperty("user.dir");    // Like:  'C:\Dev\ADB_Util'
-					//System.out.println("currDirS: '"+currDirS+"'");
-
-					iLoc = currDirS.lastIndexOf('\\');
-					if ( iLoc != -1 )
-					{
-					    // Like:  'ADB_Util>'
-					    if ( (iLoc + 1) < currDirS.length() )
-					    {
-                            currDirSb.append(currDirS.substring(iLoc + 1));
-                            currDirSb.append(">");
-                        }
-					}
-					
-					//System.out.println("currDirSb: '"+currDirSb.toString()+"'");
-					
-					// Set end to prompt..
-					outputEndS = currDirSb.toString();
-					
 /*
-					if ( actionCommandS == null )
-						System.out.println("actionCommandS null");
-					else
-						System.out.println("actionCommandS: '"+actionCommandS+"'");
+                if ( actionCommandS == null )
+                    System.out.println("\nactionCommandS null");
+                else
+                    System.out.println("\nactionCommandS: '"+actionCommandS+"'");
 /**/
 
-				}
-				
-				//System.out.println("\noutputEndS: '"+outputEndS+"'");
-
 				iTotalBytes = 0;
+				
 				int iWordLength = 0;
 				int iWordStart = 0;
 				int iSIdx;
@@ -936,738 +922,747 @@ public class ADB_Util
 				int iSplitBlockCount;
 				int iChrLoc = 0;
 				int iBreakLength = DISPLAY_WIDTH / 2;
-				boolean bInWord;
 				
+				//int iLoopCount = 0;
+				iLoopCount = 0;
+				
+				boolean bInWord;
+				String sPrevEnd = "";
+				
+				//String sT = "";
 				long lCTM1;
 				long lCTM2;
 				long lDif = 0;
-/*				
-                if ( sPid == null )
-                    System.out.println("sPid null");
-                else
-                    System.out.println("sPid: '"+sPid+"'");
-/**/                        
-
-				sB = new StringBuffer();
-				endSb = new StringBuffer();
 				
-				while ( ! isInterrupted() )
-				{
-					//System.out.println("--TOP--");
-					// Kill for Logcat..					
-					if ( bBreakOut )
-						break;
-					
-					if ( bIOBgThreadBreak )
-					    break;
-					
-					if ( out_bis.available() > 0 )	// Check Output Stream..
-					{
-						lCTM1 = System.currentTimeMillis();
-						iBytesRead = out_bis.read(tempBuf, 0, iTmpLength);
-						//System.out.println("(Output Stream)iBytesRead: "+iBytesRead);
-						if ( iBytesRead == -1 )
-						{
-							// Never gets this..
-							break;
-						}
-
-						baos.write(tempBuf, 0, iBytesRead);
-
-						lineSb.insert(0, baos.toString());
-						lineSb.setLength(iBytesRead);
-						
-						baos.reset();
-						
-						iTotalBytes += iBytesRead;
-						lCTM2 = System.currentTimeMillis();
-						lDif = lCTM2 - lCTM1;
-						//System.out.println("Diff: "+lDif);
-					}
-					else if ( error_bis.available() > 0 )	// Check Error Stream..
-					{
-						iBytesRead = error_bis.read(tempBuf, 0, iTmpLength);
-						//System.out.println("(Error Stream)iBytesRead: "+iBytesRead);
-						if ( iBytesRead == -1 )
-						{
-							// Never gets this..
-							break;
-						}
-						
-						baos.write(tempBuf, 0, iBytesRead);
-
-						lineSb.insert(0, baos.toString());
-						lineSb.setLength(iBytesRead);
-
-						baos.reset();						
-						
-						iTotalBytes += iBytesRead;
-					}
-
-/*					
-					if ( (lineSb != null) && (iBytesRead > 0) )
-					{
-						System.out.println();
-						char cTChr;
-
-						//if ( lineSb.length() > 500 )
-						//{
-							for ( int g = 0; g < lineSb.length(); g++ )
-							//for ( int g = 0; g < 500; g++ )
-							{
-								cTChr = (char)lineSb.charAt(g);
-								if ( (cTChr < 0x20) || (cTChr > 0x7e) )
-									System.out.print("["+Integer.toHexString((int)cTChr)+"]");
-								else
-									System.out.print(cTChr);
-							}
-						//}
-						System.out.println("\n");
-						System.out.println("\n");
-					}
-/**/
-
-/*
-                    if ( lineSb == null )
-                        System.out.println("lineSb null");
-                    else
-                        System.out.println("lineSb.length(): "+lineSb.length());
+				lCurrentTime = System.currentTimeMillis();
+				
+                        while ( ! isInterrupted() )
+                        {
+                            //System.out.println("--TOP--");
+                            iLoopCount++;
+                            
+/*                            
+                            if ( sc.s_KillIOBgThread )
+                                break;
 /**/                            
- 
-                    if ( (sUsePidLogcat != null) && (sUsePidLogcat.equals("true")) )
-                    {
-                        // This seems to make the PID logcat a little more responsive..
-                        Thread.sleep(5);
-                    }
-                    else
-                    {
-                        // Without this, console output
-                        // can get really laggy and unresponsive..
-                        if ( lineSb.length() < 4096 )
-                            //Thread.sleep(10);
-                            Thread.sleep(7);
-                        else
-                        {
-                            if ( lDif > 0 )
-                                Thread.sleep(40);
-                                //Thread.sleep(45);
-                            else
-                                //Thread.sleep(30);
-                                Thread.sleep(20);
-                        }
-                    }
-
-					if ( (lineSb != null) && (iBytesRead > 0) )
-					{
-						// Start of new block..
-						//System.out.println("=== NEW BLOCK ===");
-						
-						//System.out.println("bLogcatOn: "+bLogcatOn);
-						//System.out.println("sUsePidLogcat: "+sUsePidLogcat);
-                        if ( (bLogcatOn) && (sUsePidLogcat != null) && (sUsePidLogcat.length() > 0) )
-                        {
-                            if ( sUsePidLogcat.equals("true") )
+                            // Kill for Logcat..					
+                            //if ( bBreakOut )
+                            if ( bEndBreakOut )
                             {
-/*                                
-                                if ( sPid == null )
-                                    System.out.println("sPid null");
-                                else
-                                    System.out.println("sPid: '"+sPid+"'");
-/**/                                
-                                
-                                // Use PID Logcat..
-                                if ( (sPid != null) && (! sPid.equals("null")) && (sPid.length() > 0) )
-                                    ;   // Have PID..
-                                else
-                                {
-                                    // Don't have PID..
-                                    sPid = "";
-                                    StringBuffer sb = new StringBuffer();
-                                    
-                                    if ( iOS == LINUX_MAC )
-                                    {
-                                        sb.append("export PATH=${PATH}:");
-                                        sb.append(androidSdkPathS);
-                                        sb.append("/platform-tools");
-                                        sb.append(";adb ");
-                                    }
-                                    else
-                                    {
-                                        sb.append("SET PATH=");
-                                        sb.append(androidSdkPathS);
-                                        sb.append("/platform-tools");
-                                        sb.append(";%PATH%");
-                                        sb.append("&&adb ");
-                                    }
-                                    
-                                    sb.append("shell ps");
-                                        
-                                    if ( iOS == WINDOWS )
-                                        sb.append("\n");
-                                    
-                                    bCommandFinished = false;		
-                                    sInternalCommand = sb.toString();
-                                    commandBgThread = new CommandBgThread();
-                                    commandBgThread.start();
+                                // End of line..
+                                //System.out.println("bEndBreakOut breaking");
+                                break;
+                            }
                             
-                                    // Wait for Thread to finish..
-                                    while ( true )
-                                    {
-                                        try
-                                        {
-                                            Thread.sleep(333);
-                                        }
-                                        catch (InterruptedException ie)
-                                        {
-                                        }
-                        
-                                        if ( bCommandFinished )
-                                            break;
-                                    }
-                                    
-                                    //System.out.println("commandResultS: "+commandResultS);
-/*                                    
-                                    if ( sPackageName == null )
-                                        System.out.println("sPackageName null");
-                                    else
-                                        System.out.println("sPackageName: '"+sPackageName+"'");
-/**/
-
-                                    if ( (sPackageName != null) && (! sPackageName.equals("null"))
-                                        && (sPackageName.length() > 0) )
-                                    {
-                                        //System.out.println("sPackageName: '"+sPackageName+"'");
-                                        iLoc3 = commandResultS.indexOf(sPackageName);
-                                        if ( iLoc3 != -1 )
-                                        {
-                                            // Grab PID..
-                                            for ( ; commandResultS.charAt(iLoc3) != (char)0x0a; iLoc3-- );
+                            if ( bIOBgThreadBreak )
+                            {
+                                //System.out.println("bIOBgThreadBreak breaking");
+                                break;
+                            }
                             
-                                            iLoc3++;
-                                            for ( ; ! Character.isWhitespace(commandResultS.charAt(iLoc3)); iLoc3++ );
-                                            for ( ; Character.isWhitespace(commandResultS.charAt(iLoc3)); iLoc3++ );
-                                            iStart = iLoc3;
-                                            for ( ; ! Character.isWhitespace(commandResultS.charAt(iLoc3)); iLoc3++ );
-                                            
-                                            if ( (iStart >= 0) && (iLoc3 < commandResultS.length()) )
-                                                sPid = commandResultS.substring(iStart, iLoc3);
-                                            //System.out.println("sPid: '"+sPid+"'");
-                                            
-                                        }
-                                    }
-                                }
-                                
-                                sB = new StringBuffer();
-                                
-                                iLoc3 = 0;
-                                bFirst2 = true;
-/*                                
-                                if ( sPid == null )
-                                    System.out.println("sPid null");
-                                else
-                                    System.out.println("sPid: '"+sPid+"'");
-/**/                                
-
-                                if ( (sPid != null) && (sPid.length() > 0) )
+                            if ( bBreakOut )
+                            {
+                                break;
+                            }
+                            
+                            lineSb = new StringBuffer();
+                            
+                            if ( out_bis.available() > 0 )	// Check Output Stream..
+                            {
+                                lCTM1 = System.currentTimeMillis();
+                                iBytesRead = out_bis.read(tempBuf, 0, iTmpLength);
+                                //System.out.println("(Output Stream)iBytesRead: "+iBytesRead);
+                                if ( iBytesRead == -1 )
                                 {
-                                    while ( true )
-                                    {
-                                        if ( iLoc3 < lineSb.length() )
-                                            ;
-                                        else
-                                            break;
-                                        
-                                        iLoc2 = lineSb.indexOf(sZeroA, iLoc3);
-                                        if ( iLoc2 != -1 )
-                                        {
-                                            iLastZeroA = iLoc2;
-                                            
-                                            if ( bFirst2 )
-                                            {
-                                                bFirst2 = false;
-                                                endSb = new StringBuffer();
-                                                
-                                                endSb.append(sPrevEnd);
-                                                
-                                                if ( ((iLoc2 + 1) > 0) && ((iLoc2 + 1) < lineSb.length()) )
-                                                {
-                                                    endSb.append(lineSb.substring(0, iLoc2 + 1));
-                                                }
-                                                
-                                                //System.out.println("endSb: '"+endSb.toString()+"'");
-                                                
-                                                iLoc4 = endSb.indexOf(")");
-                                                if ( iLoc4 != -1 )
-                                                {
-                                                    iLoc5 = endSb.indexOf("(");
-                                                    if ( iLoc5 != -1 )
-                                                    {
-                                                        if ( (iLoc4 > 0) && (iLoc5 < iLoc4) )
-                                                        {
-                                                            if ( (iLoc5 + 1 >= 0) && (iLoc4 < endSb.length()) )
-                                                                sT = endSb.substring(iLoc5 + 1, iLoc4);
-                                                            sT = sT.trim();
-                                                            if ( sPid.equals(sT) )
-                                                            {
-                                                                //System.out.println("--Found PID--");
-                                                                sB.append(endSb.toString());
-                                                            }
-                                                        }
-                                                    }
-                                                }
-                                                
-                                                iLoc3 = iLoc2 + 1;  // Next..
-                                                continue;                                    
-                                            }
-                                            
-                                            iLoc4 = lineSb.indexOf(")", iLoc2);
-                                            if ( iLoc4 != -1 )
-                                            {
-                                                iLoc5 = lineSb.indexOf("(", iLoc2);
-                                                if ( iLoc5 != -1 )
-                                                {
-                                                    // ' 1499): Scheduling ... ( ...
-                                                    sT = "";
-                                                    if ( (iLoc4 > 0) && (iLoc5 < iLoc4) &&
-                                                            ((iLoc5 + 1) >= 0) && (iLoc4 < lineSb.length()) )
-                                                        sT = lineSb.substring(iLoc5 + 1, iLoc4);
-                                                    
-                                                    sT = sT.trim();
-                                                    if ( sPid.equals(sT) )
-                                                    {
-                                                        iLoc6 = lineSb.indexOf(sZeroA, iLoc2 + 1);
-                                                        if ( ((iLoc6 + 1) > (iLoc2 + 1)) && ((iLoc6 + 1) < lineSb.length()) )
-                                                        {
-                                                            sT2 = lineSb.substring(iLoc2 + 1, iLoc6 + 1);
-                                                            //System.out.println("sT2: '"+sT2+"'");
-                                                            sB.append(sT2);
-                                                            
-                                                        }
-                                                    }
-                                                }
-                                                else
-                                                    break;
-                                            }
-                                            else
-                                                break;
-                                        }
-                                        else
-                                            break;
-                                        
-                                        iLoc3 = iLoc2 + 1;  // Next..
-                                        
-                                    }   // End while..
+                                    // Never gets this..
+                                    break;
                                 }
-                                
-                               //System.out.println("Dropped out");
-                               if ( ((iLastZeroA + 1) >= 0) && ((iLastZeroA + 1) < lineSb.length()) )
-                                   sPrevEnd = lineSb.substring(iLastZeroA + 1);
-                                //System.out.println("(End of block)sPrevEnd: '"+sPrevEnd+"'");
-                                
-                                bFinishEnd = true;
         
-                                if ( sB.length() > 0 )
-                                    ;
-                                else
-                                    sB.append("");
+                                baos.write(tempBuf, 0, iBytesRead);
+        
+                                lineSb.insert(0, baos.toString());
+                                lineSb.setLength(iBytesRead);
                                 
-                                lineSb = sB;
+                                //System.out.println("\nlineSb: '"+lineSb.toString()+"'");
+                                
+                                baos.reset();
+                                
+                                iTotalBytes += iBytesRead;
+                                lCTM2 = System.currentTimeMillis();
+                                lDif = lCTM2 - lCTM1;       // Output stream, time to read()
+                                //System.out.println("Diff: "+lDif);
                             }
-                        }
-
-                        if ( lineSb.length() > 0 )
-                        {
-                        
-                            bInWord = false;
-                            iWordStart = 0;
-                            
-                            //System.out.println("bBlockSplit: "+bBlockSplit);
-                            if ( bBlockSplit )
+                            else if ( error_bis.available() > 0 )	// Check Error Stream..
                             {
-                                // Continue processing from previous block..
-                            }
-                            else
-                            {
-                                // New block..
-                                iWordLength = 0;
-                            }
-    
-                            iIdx = 0;
-                            bDoBreak = false;
-                            bSplit = false;
-                            iChunkLen = lineSb.length();
-                            
-                            for ( ; ; iIdx++ ) 
-                            {
-                                //System.out.println("--TOP--");
-                                if ( bDoBreak )
+                                iBytesRead = error_bis.read(tempBuf, 0, iTmpLength);
+                                //System.out.println("(Error Stream)iBytesRead: "+iBytesRead);
+                                if ( iBytesRead == -1 )
                                 {
-                                    //System.out.println("--Breaking--");
+                                    // Never gets this..
                                     break;
                                 }
                                 
-                                if ( iIdx >= iChunkLen )
+                                baos.write(tempBuf, 0, iBytesRead);
+        
+                                lineSb.insert(0, baos.toString());
+                                lineSb.setLength(iBytesRead);
+        
+                                baos.reset();						
+                                
+                                iTotalBytes += iBytesRead;
+                            }
+
+/*                            
+                            // Debbuging..					
+                            if ( (lineSb != null) && (iBytesRead > 0) )
+                            {
+                                System.out.println();
+                                char cTChr;
+        
+                                //if ( lineSb.length() > 500 )
+                                //{
+                                    for ( int g = 0; g < lineSb.length(); g++ )
+                                    //for ( int g = 0; g < 500; g++ )
+                                    {
+                                        cTChr = (char)lineSb.charAt(g);
+                                        if ( (cTChr < 0x20) || (cTChr > 0x7e) )
+                                            System.out.print("["+Integer.toHexString((int)cTChr)+"]");
+                                        else
+                                            System.out.print(cTChr);
+                                    }
+                                //}
+                                System.out.println();
+                            }
+/**/
+        
+/*
+                            if ( lineSb == null )
+                                System.out.println("(Before)lineSb null");
+                            else
+                                System.out.println("(Before)lineSb.length(): "+lineSb.length());
+/**/
+        
+/*
+                            if ( sUsePidLogcat == null )
+                                System.out.println("sUsePidLogcat null");
+                            else    
+                                System.out.println("sUsePidLogcat: "+sUsePidLogcat);
+/**/
+
+                            if ( (sUsePidLogcat != null) && (sUsePidLogcat.equals("true")) )
+                            {
+                                Thread.sleep(5);
+                            }
+                            else
+                            {
+                                // Without this, console output
+                                // can get really laggy and unresponsive..
+                                if ( lineSb.length() < 4096 )
+                                    Thread.sleep(10);
+                                else
                                 {
-                                    // Hit end of block..
-                                    cChr = lineSb.charAt(lineSb.length() - 1);
-                                    if ( (cChr == (char)0x0a) || (cChr == (char)0x0d) )
-                                        ;
+                                    
+                                    //System.out.println("lDif: "+lDif);
+                                    
+                                    if ( lDif > 0 )     // Output stream, time to read()
+                                    {
+                                        lDifCount = 0;
+                                        Thread.sleep(40);   // Was using
+                                    }
                                     else
                                     {
-                                        bBlockSplit = true;
+                                        lDifCount++;
+                                        Thread.sleep(20);     // Was using
                                     }
+                                }
+                            }
+                            
+                            //System.out.println("lDifCount: "+lDifCount);
+
+                            if ( (lineSb != null) && (iBytesRead > 0) )
+                            {
+                                // Got data, so reset..                                
+                                iLoopCount = 0;
+                                iGotZeroCount = 0;
+
+
+/*                                
+                                // Check for '"app.started"'..
+                                if ( lineSb.toString().contains(sAppStarted) )
+                                {
+                                    System.out.println("\nFound app.started");
+                                    bFoundAppStarted = true;
                                     
-                                    bDoBreak = true;
+                                    if ( resumeButton == null )
+                                        System.out.println("resumeButton null");
+                                    
+                                    if ( resumeButton != null )
+                                    {
+                                        // Ghost Resume button..
+                                        resumeButton.setEnabled(false);
+                                    }
+                                }
+/**/                                
+                                // Start of new block..
+                                //System.out.println("=== NEW BLOCK ===");
+                                //System.out.println("lineSb.length(): "+lineSb.length());
+                                
+                                bInWord = false;
+                                iWordStart = 0;
+                                boolean bFirst2;
+                                int iLastZeroA = 0;
+                                int iLoc2 = 0;
+                                //int iLoc3 = 0;
+                                int iLoc4 = 0;
+                                int iLoc5 = 0;
+                                int iLoc6 = 0;
+                                StringBuffer endSb;
+                                StringBuffer sB;
+                                //StringBuffer sb;
+                                //String sPrevEnd = "";
+                                String sT = "";
+                                String sT2 = "";
+                                String sBlockEnd = "";
+                                
+                                //System.out.println("bBlockSplit: "+bBlockSplit);
+                                if ( bBlockSplit )
+                                {
+                                    // Continue processing from previous block..
                                 }
                                 else
                                 {
-                                    cChr = lineSb.charAt(iIdx);
-                                    if ( Character.isWhitespace(cChr) )
+                                    // New block..
+                                    iWordLength = 0;
+                                }
+        
+                                // In Flutter there
+                                // were some bad lead characters
+                                // so kill any of those..
+                                if ( lineSb.length() > 0 )
+                                {
+                                    while ( true )
                                     {
-                                        // Whitespace..
-                                        iWordLength = 0;	// Reset..
-                                        bInWord = false;	// Reset..
+                                        if ( lineSb.charAt(0) > 0x7f )
+                                        {
+                                            lineSb.deleteCharAt(0);
+                                            continue;
+                                        }
+                                        else
+                                            break;
+                                    }
+                                }
+/**/
+
+                                iIdx = 0;
+                                bDoBreak = false;
+                                bSplit = false;
+                                iChunkLen = lineSb.length();
+                                //System.out.println("bBlockSplit: "+bBlockSplit);
+                                //System.out.println("iWordLength: "+iWordLength);
+                                //System.out.println("iWordStart: "+iWordStart);
+                                
+                                for ( ; ; iIdx++ ) 
+                                {
+                                    //System.out.println("--TOP--  iIdx: "+iIdx);
+                                    if ( bDoBreak )
+                                    {
+                                        //System.out.println("--Breaking--");
+                                        break;
+                                    }
+                                    
+                                    //System.out.println("iChunkLen: "+iChunkLen);
+                                    if ( iIdx >= iChunkLen )
+                                    {
+                                        // Hit end of block..
+                                        cChr = ' ';
+                                        if ( ((lineSb.length() - 1) >= 0) && ((lineSb.length() - 1) < lineSb.length()) )
+                                        {
+                                            cChr = lineSb.charAt(lineSb.length() - 1);
+                                        }
+                                        
+                                        if ( (cChr == (char)0x0a) || (cChr == (char)0x0d) )
+                                            ;
+                                        else
+                                        {
+                                            bBlockSplit = true;
+                                        }
+                                        
+                                        bDoBreak = true;
                                     }
                                     else
                                     {
-                                        // Character..
-                                        if ( bInWord == false )
-                                        {
-                                            bInWord = true;
-                                            iWordStart = iIdx;
-                                        }
-                                            
-                                        iWordLength++;
-                                        if ( iWordLength >= DISPLAY_BREAK_WIDTH )
-                                        {
-                                            bSplit = true;
-                                        }
-                                    }
-                                }
-                                
-                                if ( bSplit )
-                                {
-                                    // Split..
-                                    //System.out.println("\n== SPLIT ==");
-                                    bSplit = false;		// Reset..
-                                    iSIdx = iWordStart;
-                                    
-                                    iSplitBlockCount = iWordLength;
-                                    iWordLength = 0;	// Reset..
-                                    
-                                    //System.out.println("iSplitBlockCount: "+iSplitBlockCount);
-                                    iChrLoc = 0;
-                                    
-                                    for ( ; ; iSIdx++, iSplitBlockCount++ )
-                                    {
-                                        if ( iSIdx >= iChunkLen )
-                                        {
-                                            // Hit end..
-                                            cChr = lineSb.charAt(lineSb.length() - 1);
-                                            if ( (cChr == (char)0x0a) || (cChr == (char)0x0d) )
-                                                ;
-                                            else
-                                            {
-                                                iWordLength = iSplitBlockCount;
-                                            }
-    
-                                            bDoBreak = true;
-                                            break;
-                                        }
-                                        
-                                        cChr = lineSb.charAt(iSIdx);
+                                        cChr = lineSb.charAt(iIdx);
                                         if ( Character.isWhitespace(cChr) )
                                         {
-                                            // Done..
-                                            break;
+                                            // Whitespace..
+                                            iWordLength = 0;	// Reset..
+                                            bInWord = false;	// Reset..
                                         }
-                                        
-                                        if ( ! Character.isLetterOrDigit(cChr) )
+                                        else
                                         {
-                                            // Special character..
-                                            iChrLoc = iSIdx;
-                                            //System.out.println("(Special)iChrLoc: "+iChrLoc);
-                                        }
-                                        
-                                        if ( iSplitBlockCount > iBreakLength )
-                                        {
-                                            if ( iChrLoc > (iSIdx - (iBreakLength / 2) ) )
+                                            // Character..
+                                            if ( bInWord == false )
                                             {
-                                                lineSb.insert((iChrLoc + 1), ' ');
+                                                bInWord = true;
+                                                iWordStart = iIdx;
+                                            }
+                                                
+                                            iWordLength++;
+                                            if ( iWordLength >= DISPLAY_BREAK_WIDTH )
+                                            {
+                                                bSplit = true;
+                                            }
+                                        }
+                                    }
+                                    
+                                    //System.out.println("bSplit: "+bSplit);
+                                    if ( bSplit )
+                                    {
+                                        // Split..
+                                        //System.out.println("\n== SPLIT ==");
+                                        bSplit = false;		// Reset..
+                                        iSIdx = iWordStart;
+                                        
+                                        iSplitBlockCount = iWordLength;
+                                        iWordLength = 0;	// Reset..
+                                        
+                                        //System.out.println("iSplitBlockCount: "+iSplitBlockCount);
+                                        iChrLoc = 0;
+                                        
+                                        for ( ; ; iSIdx++, iSplitBlockCount++ )
+                                        {
+                                            if ( iSIdx >= iChunkLen )
+                                            {
+                                                // Hit end..
+                                                cChr = lineSb.charAt(lineSb.length() - 1);
+                                                if ( (cChr == (char)0x0a) || (cChr == (char)0x0d) )
+                                                    ;
+                                                else
+                                                {
+                                                    iWordLength = iSplitBlockCount;
+                                                }
+        
+                                                bDoBreak = true;
+                                                break;
+                                            }
+                                            
+                                            cChr = lineSb.charAt(iSIdx);
+                                            if ( Character.isWhitespace(cChr) )
+                                            {
+                                                // Done..
+                                                break;
+                                            }
+                                            
+                                            if ( ! Character.isLetterOrDigit(cChr) )
+                                            {
+                                                // Special character..
+                                                iChrLoc = iSIdx;
+                                                //System.out.println("(Special)iChrLoc: "+iChrLoc);
+                                            }
+                                            
+                                            if ( iSplitBlockCount > iBreakLength )
+                                            {
+                                                //System.out.println("iSplitBlockCount > iBreakLength");
+                                                if ( iChrLoc > (iSIdx - (iBreakLength / 2) ) )
+                                                {
+                                                    lineSb.insert((iChrLoc + 1), ' ');
+                                                }
+                                                else
+                                                {
+                                                    // No special characters found..
+                                                    lineSb.insert((iSIdx + 1), ' ');
+                                                }
+                                                
+                                                iChunkLen++;	// Adjust for added space..
+                                                iSIdx += 1;		// Adjust past insert, plus loop increment..
+                                                iChrLoc = 0;	// Reset..
+                                                iSplitBlockCount = 0;
+                                                
+                                            }
+                                        }	// End for..
+                                        
+                                        //System.out.println("Dropped out");
+                                    }
+                                }	// End for..
+                                
+                                //System.out.println("(A)Dropped out");
+                                
+                            }   // End if ( (lineSb != null) && (iBytesRead > 0) )
+                            else
+                            {
+                                // Didn't get anything..
+                                //System.out.println("Didn't get anything");
+                                
+                                iGotZeroCount++;
+                                //System.out.println("(Nothing)iGotZeroCount: "+iGotZeroCount);
+                                //System.out.println("iLoopCount: "+iLoopCount);
+                                
+                                //if ( iLoopCount > 3000 )
+                                //{
+                                    //bBreakOut = true;
+                                //}
+                            }
+/**/	
+
+//--------------------------------------------------------------------------------
+// End test
+//--------------------------------------------------------------------------------
+
+/*
+                            if ( commandPhrase == null )
+                                System.out.println("commandPhrase null");
+                            else
+                                System.out.println("commandPhrase: '"+commandPhrase+"'");
+/**/                                    
+                                    
+                            // Note:
+                            //
+                            // Sometimes it can catch the end prompt early,
+                            // so we need an end test..
+                            if ( iBytesRead > 0 )
+                            {
+                                //iGotZeroCount = 0;  // Reset..
+                                
+                                if ( bLogcatOn == false )
+                                {
+/*                                    
+                                    if ( (commandPhrase != null) && (commandPhrase.length() > 0) )
+                                    {
+                                        //System.out.println("commandPhrase: '"+commandPhrase+"'");
+                                        if ( lineSb.indexOf(commandPhrase) != -1 )
+                                        {
+                                            //System.out.println("--Found Phrase--");
+                                            bFoundPhrase = true;
+                                        }
+                                    }
+                                    else
+                                    {
+                                        // Prevent early end..
+                                        if ( (lCurrentTime + 2000) < (long)System.currentTimeMillis() )
+                                            ;   // Too early..
+                                        else
+                                            bFoundPhrase = true;
+                                    }
+/**/
+
+                                    //System.out.println("lineSb.length(): "+lineSb.length());
+                                    
+                                    //if ( ((lineSb.length() - 1) >= 0) && (lineSb.charAt(lineSb.length() - 1) == '>') )
+                                    //{
+                                        lineS = lineSb.substring(0, lineSb.length());
+    
+                                        if ( lineS.length() > 5 )
+                                        {
+                                            if ( (lineS.length() - 5) < lineS.length() )
+                                                sTest = lineS.substring(lineS.length() - 5);
+                                            
+                                            //System.out.println("bFoundPhrase: "+bFoundPhrase);
+                                            //System.out.println("sTest: '"+sTest+"'");
+                                            //if ( bFoundPhrase && (sTest.endsWith(">") || sTest.endsWith("$")) )
+                                            if ( (sTest.endsWith(">") || sTest.endsWith("$")) )
+                                            {
+                                                //System.out.println("\nHit end");
+                                                bEndBreakOut = true;
+                                            }
+                                        }
+                                    //}
+                                    
+/*
+                                    if ( sGradlewCommand == null )
+                                        System.out.println("sGradlewCommand null");
+                                    else
+                                        System.out.println("sGradlewCommand: '"+sGradlewCommand+"'");
+/**/                                
+                                    //System.out.println("(Check)lineSb: '"+lineSb.toString()+"'");
+
+/*                                    
+                                    if ( (sGradlewCommand != null) && (lineSb.indexOf(sGradlewCommand) != -1) )
+                                    {
+                                        // Finish Progress Bar early..
+                                        //System.out.println("--FOUND--");
+                                        bFinished = true;
+                                    }
+/**/    
+
+/*                                    
+                                    if ( bGradleSelected && (! bFinished) )
+                                    {
+                                        if ( (lineSb.indexOf("preBuild") != -1) ||
+                                            (lineSb.indexOf(":clean") != -1) )
+                                        {
+                                            // Finish Progress Bar early..
+                                            bFinished = true;
+                                        }
+                                    }
+/**/                                    
+                                }
+        
+                                outLineS = "";	// Final line to be inserted..
+                                bContinued = false;
+                                iType = NORMAL;
+                                iLineLen = lineSb.length();
+                                
+                                try
+                                {
+                                    doc = textPane.getStyledDocument();
+        
+                                    if ( bLogcatOn )
+                                    {
+                                        // Logcat output..
+                                        bLineBreakOut = false;
+                                        iIndex = 0;
+                                        
+                                        while ( true )
+                                        {
+                                            if ( bCompletePartialLine )
+                                            {
+                                                // Reset..
+                                                bCompletePartialLine = false;
+                                                
+                                                // Capture rest of line..
+                                                iStart = iIndex;
+                                                bHitTrailing = false;
+                                                
+                                                for ( ;; iIndex++ )
+                                                {
+                                                    if ( iIndex >= iLineLen )
+                                                        break;
+                                                    
+                                                    if ( bHitTrailing )
+                                                    {
+                                                        if ( Character.isWhitespace(lineSb.charAt(iIndex)) )
+                                                            ;
+                                                        else
+                                                            break;
+                                                    }
+                        
+                                                    if ( (lineSb.charAt(iIndex) == 0x0d) ||
+                                                            (lineSb.charAt(iIndex) == 0x0a) )
+                                                        bHitTrailing = true;
+                                                }
+        
+                                                // Set up for output..
+                                                if ( bHitTrailing )
+                                                    bSaveLen = false;	// Reset..
+                                                    
+                                                iType = iCurrentType;
+                                                if ( (iStart >= 0) && (iIndex >= 0) && (iIndex < lineSb.length()) )
+                                                {
+                                                    outLineS = lineSb.substring(iStart, iIndex);
+                                                }
                                             }
                                             else
                                             {
-                                                // No special characters found..
-                                                lineSb.insert((iSIdx + 1), ' ');
+                                                // Process line from Start..
+                                                iLenSave = 0;	// Reset..
+                                                
+                                                // Set Type..
+                                                if ( ((iIndex + 1) < iLineLen) &&
+                                                    (lineSb.charAt(iIndex + 1) == '/') )
+                                                {
+                                                    // Start Characters, X/..
+                                                    if ( lineSb.charAt(iIndex) == 'E' )
+                                                        iType = ERROR;												
+                                                    else if ( lineSb.charAt(iIndex) == 'W' )
+                                                        iType = WARNING;
+                                                    else
+                                                        iType = NORMAL;
+                                                }
+                                                else
+                                                {
+                                                    // Not a "Start"..
+                                                    iType = NORMAL;
+                                                }
+                                                
+                                                iStart = iIndex;
+                                                bOver = false;
+                                                bHitTrailing = false;
+                                                
+                                                for ( ;; iIndex++ )
+                                                {
+                                                    if ( iIndex >= iLineLen )
+                                                    {
+                                                        bOver = true;
+                                                        break;
+                                                    }
+                                                    
+                                                    if ( bHitTrailing )
+                                                    {
+                                                        if ( Character.isWhitespace(lineSb.charAt(iIndex)) )
+                                                            ;
+                                                        else
+                                                            break;	// Start of next line..
+                                                    }
+        
+                                                    if ( (lineSb.charAt(iIndex) == 0x0d) ||
+                                                            (lineSb.charAt(iIndex) == 0x0a) )
+                                                        bHitTrailing = true;
+                                                }
+                                                
+                                                if ( bOver )
+                                                {
+                                                    // Set up to draw what we have..
+                                                    if ( (iStart >= 0) && (iStart < lineSb.length()) )
+                                                    {
+                                                        outLineS = lineSb.substring(iStart);
+                                                    }
+                                                    
+                                                    iCurrentType = iType;	// Save for next draw..
+                                                    
+                                                    if ( ! bHitTrailing )
+                                                    {
+                                                        bCompletePartialLine = true;
+                                                        bSaveLen = true;
+                                                    }
+                                                    
+                                                    // Signal to break..
+                                                    bLineBreakOut = true;
+                                                }
+                                                else
+                                                {
+                                                    if ( (iStart >= 0) && (iIndex >= 0) && (iIndex < lineSb.length()) )
+                                                    {
+                                                        outLineS = lineSb.substring(iStart, iIndex);
+                                                    }
+                                                }
                                             }
                                             
-                                            iChunkLen++;	// Adjust for added space..
-                                            iSIdx += 1;		// Adjust past insert, plus loop increment..
-                                            iChrLoc = 0;	// Reset..
-                                            iSplitBlockCount = 0;
+                                            // We should now have the full line
+                                            // including any trailing 0x0d 0x0a
+                                            iLen = doc.getLength();
+        
+                                            // Try to back up over any trailing 0x0d 0x0a
+                                            // to append the partial string..									
+                                            if ( (iLenSave > 0) && (iLen > 0) )
+                                            {
+                                                int iJ;
+                                                String xS = "";
+                                                for ( iJ = iLenSave; ; iJ-- )
+                                                {
+                                                    xS = doc.getText(iJ, 1);
+                                                    if ( xS.equals(0x0d) || xS.equals(0x0a) )
+                                                        ;
+                                                    else
+                                                        break;
+                                                }
+                                                
+                                                iLen = iJ;
+                                            }
                                             
-                                        }
-                                    }	// End for..
-                                    
-                                    //System.out.println("Dropped out");
-                                }
-                            }	// End for..
-                        }
-					}
-/**/					
-                    //System.out.println("\nPast split block");
-                    
-					// Note:
-					//
-					// Sometimes it can catch the end prompt early,
-					// so we need an end test..
-					//System.out.println("iBytesRead: "+iBytesRead);
-					if ( iBytesRead > 0 )
-					{
-						if ( ! bLogcatOn )
-						{
-							if ( iOS == WINDOWS )
-							{
-								if ( lineSb.charAt(lineSb.length() - 1) == '>' )
-								{
-									lineS = lineSb.substring(0, lineSb.length());
-
-                                    if ( lineS.endsWith(outputEndS) )
-                                    {
-                                        //System.out.println("End matched, breaking out..");
-                                        bBreakOut = true;	// Signal to break out..
+                                            if ( iType == NORMAL )
+                                                doc.insertString(iLen, outLineS, normalStyle);
+                                            else if ( iType == WARNING )
+                                                doc.insertString(iLen, outLineS, warningStyle);
+                                            else if ( iType == ERROR )
+                                                doc.insertString(iLen, outLineS, errorStyle);
+                                            
+                                            if ( bSaveLen )
+                                                iLenSave = doc.getLength();
+                                                
+                                            if ( iLen > 0 )
+                                            {
+                                                // Keep all output in view..
+                                                textPane.setCaretPosition(doc.getLength() - 1);
+                                            }
+                                            
+                                            if ( bLineBreakOut )
+                                                break;
+                                            
+                                        }	// End while..
+                                        
+                                        //System.out.println("Dropped out");
                                     }
-								}
-							}
-						}
+                                    else
+                                    {
+                                        //System.out.println("Normal Output, iBytesRead: "+iBytesRead);
+                                        //System.out.println("lineSb.length(): "+lineSb.length());
+                                        // Normal output..
+                                        if ( iBytesRead > 0 ) 
+                                        {
+                                            outS = lineSb.substring(0, lineSb.length());
+                                            
+                                            iLen = doc.getLength();
+                                            
+                                            // This can have issues.
+                                            // It's most noticable when you do a Gradle 'Release'.
+                                            // It gets the output strings, but doesn't do anything with them
+                                            // until the end, when it dumps everything.
+                                            // With the new SwingWorker it seems to be better.
+        
+                                            doc.insertString(iLen, outS, normalStyle);
+                                            
+                                            if ( iLen > 0 )
+                                            {
+                                                textPane.setCaretPosition(doc.getLength() - 1);
+                                                textPane.repaint();
+                                            }
+                                        }
+                                    }
+                                }
+                                catch (IllegalArgumentException iae)
+                                {
+                                    iae.printStackTrace();
+                                }
+                                catch (BadLocationException ble)
+                                {
+                                    ble.printStackTrace();
+                                }
+                            }
+                            else    // if ( iBytesRead > 0 )
+                            {
+                                // No output..
+                                
+                                //System.out.println("(No output)iLoopCount: "+iLoopCount);
+                                
+                                
+                                
+                                if ( iOS == LINUX_MAC )
+                                //if ( true )
+                                {
+                                    // If still getting data
+                                    // gets Exception:
+                                    // 'Exception: java.lang.IllegalThreadStateException: process hasn't exited'
+                                    // When I/O is finished, does exitValue()..
+                                    try
+                                    {
+                                        iExitVal = proc.exitValue();
+                                        //System.out.println("iExitVal: "+iExitVal);
 
-						outLineS = "";	// Final line to be inserted..
-						bContinued = false;
-						iType = NORMAL;
-						iLineLen = lineSb.length();
+                                        // In cases like Install, it can quit before
+                                        // the result gets output, so this give it more
+                                        // time to output the results..                                        
+                                        iExitCount++;
+                                        if ( iExitCount > 10 )
+                                        {
+                                            break;
+                                        }
+                                    }
+                                    catch (IllegalThreadStateException itse)
+                                    {
+                                        // Still getting data..
+                                        //System.out.println(itse.toString());
+                                    }
+                                }
+                            }
+                            
+                            iBytesRead = 0;
+                            
+                        }	// End while, while ( ! isInterrupted() )
+                        
+/*                        
+                        if ( sc.s_ShowProgressBar )
+                        {
+                            if ( tProgressJFrame != null )
+                            {
+                                tProgressJFrame.dispose();
+                                tProgressJFrame = null;
+                            }
+                        }
+/**/ 
 
-						try
-						{
-							doc = textPane.getStyledDocument();
-
-							//System.out.println("\nbLogcatOn: "+bLogcatOn);
-							if ( bLogcatOn )
-							{
-								bLineBreakOut = false;
-								iIndex = 0;
-								
-								while ( true )
-								{
-									if ( bCompletePartialLine )
-									{
-										// Reset..
-										bCompletePartialLine = false;
-										
-										// Capture rest of line..
-										iStart = iIndex;
-										bHitTrailing = false;
-										
-										for ( ;; iIndex++ )
-										{
-											if ( iIndex >= iLineLen )
-												break;
-											
-											if ( bHitTrailing )
-											{
-												if ( Character.isWhitespace(lineSb.charAt(iIndex)) )
-													;
-												else
-													break;
-											}
-				
-											if ( (lineSb.charAt(iIndex) == 0x0d) ||
-													(lineSb.charAt(iIndex) == 0x0a) )
-												bHitTrailing = true;
-										}
-
-										// Set up for output..
-										if ( bHitTrailing )
-											bSaveLen = false;	// Reset..
-											
-										iType = iCurrentType;
-										if ( (iStart >= 0) && (iIndex < lineSb.length()) )
-										    outLineS = lineSb.substring(iStart, iIndex);
-									}
-									else
-									{
-										// Process line from Start..
-										iLenSave = 0;	// Reset..
-										
-										// Set Type..
-										if ( ((iIndex + 1) < iLineLen) &&
-											(lineSb.charAt(iIndex + 1) == '/') )
-										{
-											// Start Characters, X/..
-											if ( lineSb.charAt(iIndex) == 'E' )
-												iType = ERROR;												
-											else if ( lineSb.charAt(iIndex) == 'W' )
-												iType = WARNING;
-											else
-												iType = NORMAL;
-										}
-										else
-										{
-											// Not a "Start"..
-											iType = NORMAL;
-										}
-										
-										iStart = iIndex;
-										bOver = false;
-										bHitTrailing = false;
-										
-										for ( ;; iIndex++ )
-										{
-											if ( iIndex >= iLineLen )
-											{
-												bOver = true;
-												break;
-											}
-											
-											if ( bHitTrailing )
-											{
-												if ( Character.isWhitespace(lineSb.charAt(iIndex)) )
-													;
-												else
-													break;	// Start of next line..
-											}
-
-											if ( (lineSb.charAt(iIndex) == 0x0d) ||
-													(lineSb.charAt(iIndex) == 0x0a) )
-												bHitTrailing = true;
-										}
-										
-										if ( bOver )
-										{
-										    if ( iStart < lineSb.length() )
-										        outLineS = lineSb.substring(iStart);
-											iCurrentType = iType;	// Save for next draw..
-											
-											if ( ! bHitTrailing )
-											{
-												bCompletePartialLine = true;
-												bSaveLen = true;
-											}
-											
-											// Signal to break..
-											bLineBreakOut = true;
-										}
-										else
-										{
-										    if ( (iStart >= 0) && (iIndex < lineSb.length()) )
-										        outLineS = lineSb.substring(iStart, iIndex);
-										}
-									}
-									
-									// We should now have the full line
-									// including any trailing 0x0d 0x0a
-									iLen = doc.getLength();
-
-									// Try to back up over any trailing 0x0d 0x0a
-									// to append the partial string..									
-									if ( (iLenSave > 0) && (iLen > 0) )
-									{
-										int iJ;
-										String xS = "";
-										for ( iJ = iLenSave; ; iJ-- )
-										{
-											xS = doc.getText(iJ, 1);
-											if ( xS.equals(0x0d) || xS.equals(0x0a) )
-												;
-											else
-												break;
-										}
-										
-										iLen = iJ;
-									}
-
-                                    //System.out.println("\niType: "+iType);									
-									if ( iType == NORMAL )
-										doc.insertString(iLen, outLineS, normalStyle);
-									else if ( iType == WARNING )
-										doc.insertString(iLen, outLineS, warningStyle);
-									else if ( iType == ERROR )
-										doc.insertString(iLen, outLineS, errorStyle);
-									
-									if ( bSaveLen )
-										iLenSave = doc.getLength();
-										
-									if ( iLen > 0 )
-									{
-										// Keep all output in view..
-										textPane.setCaretPosition(doc.getLength() - 1);
-									}
-									
-									if ( bLineBreakOut )
-										break;
-									
-								}	// End while..
-								
-								//System.out.println("Dropped out");
-							}
-							else
-							{
-								//System.out.println("Normal Output, iBytesRead: "+iBytesRead);
-								//System.out.println("lineSb.length(): "+lineSb.length());
-								// Normal output..
-								if ( iBytesRead > 0 ) 
-								{
-									outS = lineSb.substring(0, lineSb.length());
-									
-									iLen = doc.getLength();
-									
-									doc.insertString(iLen, outS, normalStyle);
-									
-									if ( iLen > 0 )
-									{
-										textPane.setCaretPosition(doc.getLength() - 1);
-										textPane.repaint();
-									}
-								}
-							}
-						}
-						catch (IllegalArgumentException iae)
-						{
-							iae.printStackTrace();
-						}
-						catch (BadLocationException ble)
-						{
-							ble.printStackTrace();
-						}
-					}
-					else
-					{
-						// No output..
-						if ( iOS == LINUX_MAC )
-						{
-							// If still getting data
-							// gets Exception:
-							// 'Exception: java.lang.IllegalThreadStateException: process hasn't exited'
-							// When I/O is finished, does exitValue()..
-							try
-							{
-								iExitVal = proc.exitValue();
-								//System.out.println("iExitVal: "+iExitVal);
-								break;
-							}
-							catch (IllegalThreadStateException itse)
-							{
-								//System.out.println(itse.toString());
-							}
-						}
-					}
-					
-					iBytesRead = 0;
-					
-				}	// End while..
-				
 				bIOBgThreadBreak = false;    // Reset..
 				
-				//System.out.println("\nIOBgThread dropped out");
+				//System.out.println("====IOBgThread dropped out====");
 			}
 			catch (Exception e)
 			{
@@ -1725,19 +1720,14 @@ public class ADB_Util
 			//System.gc();
 
 			bIOBgThreadFinished = true;
-
-			if ( bLogcatOn )
-			{
-                // Turn off status message..                    
-                statusPath.setText("    ");
-			}
-			    
+			
 			// Reset..
 			bBreakOut = false;
 			bLogcatOn = false;
 			bFinished = true;
 
-			//System.out.println("Exiting IOBgThread run()");
+			//System.out.println("\nExiting IOBgThread run()");
+			
 		}
 	}	//}}}
 
@@ -1864,7 +1854,8 @@ public class ADB_Util
             {
                 try
                 {
-                    Thread.sleep(333);
+                    //Thread.sleep(333);
+                    Thread.sleep(500);
                 }
                 catch (InterruptedException ie)
                 {
@@ -1874,14 +1865,15 @@ public class ADB_Util
                     break;
             }
 
-/*            
+            
+/*
             if ( commandResultS == null )
                 System.out.println("commandResultS null");
             else
             {
-                System.out.println("============================================");
-                System.out.println("commandResultS: '"+commandResultS+"'");
-                //System.out.println("commandResultS.length(): "+commandResultS.length());
+                //System.out.println("============================================");
+                //System.out.println("commandResultS: '"+commandResultS+"'");
+                System.out.println("commandResultS.length(): "+commandResultS.length());
             }
 /**/ 
 
@@ -1951,7 +1943,8 @@ public class ADB_Util
                     {
                         sT = st.nextToken();
                         sT = sT.trim();
-                        tokSa[iTokIndex] = sT;
+                        if ( iTokIndex < tokSa.length )
+                            tokSa[iTokIndex] = sT;
                         //System.out.println("["+iTokIndex+"]: '"+tokSa[iTokIndex]+"'");
                     }
                     
@@ -2089,8 +2082,9 @@ public class ADB_Util
                                     {
                                         if ( bStartedNm )
                                             sNameSb.append(" ");
-                                            
-                                        sNameSb.append(tokSa[iZ]);
+                                        
+                                        if ( iZ < tokSa.length )
+                                            sNameSb.append(tokSa[iZ]);
                                         break;
                                     }
                                 }
@@ -2106,10 +2100,12 @@ public class ADB_Util
                                             // 12:49 vendor -> /system/vendor
                                             // 11:52 Screen recordings
                                             
-                                            if ( tokSa[iZ].startsWith("->") )
+                                            //if ( tokSa[iZ].startsWith("->") )
+                                            if ( (iZ < tokSa.length) && (tokSa[iZ].startsWith("->")) )
                                             {
                                                 // Symlink, so treat next token as the new path
-                                                sSymLinkPath = tokSa[iZ + 1];
+                                                if ( (iZ + 1) < tokSa.length )
+                                                    sSymLinkPath = tokSa[iZ + 1];
                                                 bSkipToNext = true;
                                                 //iZ += 2;
                                                 //break;
@@ -2117,13 +2113,15 @@ public class ADB_Util
                                             else
                                             {
                                                 sNameSb.append(" ");
-                                                sNameSb.append(tokSa[iZ]);
+                                                if ( iZ < tokSa.length )
+                                                    sNameSb.append(tokSa[iZ]);
                                             }
                                         }
                                         else
                                         {
                                             // First name token..
-                                            sNameSb.append(tokSa[iZ]);
+                                            if ( iZ < tokSa.length )
+                                                sNameSb.append(tokSa[iZ]);
                                             bStartedNm = true;
                                         }
                                     }
@@ -2277,7 +2275,6 @@ public class ADB_Util
             System.out.println();
 /**/
 
-
 /*
 			if ( commandResultS == null )
 				System.out.println("(devices)commandResultS null");
@@ -2330,8 +2327,13 @@ public class ADB_Util
 			}
 
 /*			
-			for ( int iJ = 0; iJ < DevicesAr.size(); iJ++ )
-				System.out.println("["+iJ+"]: '"+(String)DevicesAr.get(iJ)+"'");
+            if ( DevicesAr == null )
+                System.out.println("DevicesAr null");
+            else
+            {
+                for ( int iJ = 0; iJ < DevicesAr.size(); iJ++ )
+                    System.out.println("["+iJ+"]: '"+(String)DevicesAr.get(iJ)+"'");
+            }
 /**/
 
 			bDevicesFinished = true;
@@ -2469,8 +2471,9 @@ public class ADB_Util
             {
                 sT = st.nextToken();
                 sT = sT.trim();
-                //System.out.println("sT: '"+sT+"'");                
-                tSa[iTokIndex] = sT;    // Like:  '004E-A507'
+                //System.out.println("sT: '"+sT+"'");    
+                if ( (tSa != null) && (iTokIndex < tSa.length) )
+                    tSa[iTokIndex] = sT;    // Like:  '004E-A507'
             }
 
             for ( int iM = 0; iM < tSa.length; iM++ )
@@ -2883,6 +2886,12 @@ public class ADB_Util
 				
 				// Get IP address..
 				// Check if we have it..
+/*				
+				if ( sDeviceIPAddress == null )
+				    System.out.println("sDeviceIPAddress null");
+				else
+				    System.out.println("sDeviceIPAddress: '"+sDeviceIPAddress+"'");
+/**/				    
 				
 				if ( (sDeviceIPAddress != null) && (sDeviceIPAddress.length() > 0) )
 				{
@@ -2897,6 +2906,7 @@ public class ADB_Util
 				}
 				else
 				{
+				    //System.out.println("Getting IP address");
 					internalSb = new StringBuffer();
 					if ( iOS == LINUX_MAC )
 					{
@@ -3093,7 +3103,7 @@ public class ADB_Util
 					if ( bInternalFinished )
 						break;
 				}
-
+				
 /*
 				if ( commandResultS != null )
 				{
@@ -3141,6 +3151,7 @@ public class ADB_Util
 		{
 		    //System.out.println("");
 			//System.out.println("ConnectWirelessBgThread run()");
+			
 			StringBuffer internalSb = new StringBuffer();
 			StringBuffer wIdSb;
 			StringBuffer mSb;
@@ -3186,7 +3197,7 @@ public class ADB_Util
             // Note:
             // After Disconnect the sWirelessID shouldn't be valid..
 
-/* 
+/*            
 			if ( sWirelessID == null )
 				System.out.println("sWirelessID null");
 			else
@@ -3288,7 +3299,7 @@ public class ADB_Util
 						// Success..
 						// Set to use 'sWirelessID' as the new device name for -s..
 						sDeviceName = sWirelessID;
-						System.out.println("sDeviceName: '"+sDeviceName+"'");
+						//.println("sDeviceName: '"+sDeviceName+"'");
 						
 						bOK = true;
 					}
@@ -4211,6 +4222,7 @@ public class ADB_Util
 	{
 	    //System.out.println("\n-------------------------------");
 	    //System.out.println("FileBrowserDialog()");
+	    
 	    String[] tSa = null;
 	    String[] pathSa = null;
 	    String[] listSa = null;
@@ -4267,7 +4279,8 @@ public class ADB_Util
             try
             {
                 //Thread.sleep(250);
-                Thread.sleep(333);
+                //Thread.sleep(333);
+                Thread.sleep(500);
             }
             catch (InterruptedException ie)
             {
@@ -4307,7 +4320,8 @@ public class ADB_Util
                 }
                 
                 //listSa[g] = (String)fileToksAr.get(g);
-                listSa[g] = (String)sT;
+                if ( (listSa != null) && (g < listSa.length) )
+                    listSa[g] = (String)sT;
                 //System.out.println("listSa["+g+"]: '"+listSa[g]+"'");
             }
 
@@ -4352,7 +4366,7 @@ public class ADB_Util
             // Construct name..
             sT = "";
             
-            if ( (pathSa != null) && (pathSa.length > 0) )
+            if ( (pathSa != null) && (pathSa.length > 0) && (iTokIndex < pathSa.length) )
                 sT = pathSa[iTokIndex];
             
             if ( (sT != null) && (! sT.equals("null")) && (sT.length() > 0) )
@@ -4514,7 +4528,7 @@ public class ADB_Util
 				{
 				    if ( g < ConnectDevicesAr.size() )
 				    {
-				        if ( g < tSa.length )
+				        if ( (tSa != null) && (g < tSa.length) )
 				            tSa[g] = (String)ConnectDevicesAr.get(g);
 				    }
 				}
@@ -4522,7 +4536,7 @@ public class ADB_Util
 				{
 				    if ( g < DevicesAr.size() )
 				    {
-				        if ( g < tSa.length )
+				        if ( (tSa != null) && (g < tSa.length) )
 				            tSa[g] = (String)DevicesAr.get(g);
 				    }
 				}
@@ -4683,22 +4697,26 @@ public class ADB_Util
                 }
 /**/
 
-                if ( (sUseDirectScreenshotDownload != null) && (sUseDirectScreenshotDownload.length() > 0) )
+                // Note:
+                // As an alternative, use this to transfer
+                // to Download directory:
+                
+                // adb shell screencap -p /sdcard/screencap.png
+                // adb pull /sdcard/screencap.png C:\\Users\\<username>\\Pictures\\screencap.png
+                
+                if ( (sUseDirectScreenshotDownload != null) && (sUseDirectScreenshotDownload.equals("true")) )
                 {
-                    if ( sUseDirectScreenshotDownload.equals("true") )
+                    // Direct..
+                    bUseDirect = true;
+                    sb.append("exec-out screencap -p > ");
+                    
+                    if ( (sDownloadDir != null) && (sDownloadDir.length() > 0) )
                     {
-                        // Direct..
-                        bUseDirect = true;
-                        sb.append("exec-out screencap -p > ");
-                        
-                        if ( (sDownloadDir != null) && (sDownloadDir.length() > 0) )
-                        {
-                            sb.append('"');
-                            sb.append(sDownloadDir);
-                            sb.append("/");
-                            sb.append(sBNm.toString());
-                            sb.append('"');
-                        }
+                        sb.append('"');
+                        sb.append(sDownloadDir);
+                        sb.append("/");
+                        sb.append(sBNm.toString());
+                        sb.append('"');
                     }
                 }
                 
@@ -4706,9 +4724,16 @@ public class ADB_Util
                 {
                     sb.append("shell screencap ");
                     
+                    sb.append("-p /sdcard");
+                    
+/*                    
                     if ( (sScreenshotDir != null) && (sScreenshotDir.length() > 0) )
                         sb.append(sScreenshotDir);
-                    
+                    else
+                    {
+                        sb.append("-p /sdcard");
+                    }
+/**/                    
                     sb.append("/");
                     sb.append(sBNm.toString());
                 }
@@ -4720,18 +4745,91 @@ public class ADB_Util
                 // Set up for IOBgThread output..
                 commandS = sb.toString();
                 
+                sc = SingletonClass.getInstance();
+                sc.s_sCommand = commandS;
+                
+                bIOBgThreadFinished = false;
                 iOBgThread = new IOBgThread();
                 iOBgThread.start();
                 
-/*                
-                try
+                while ( true )
                 {
-                    commandRequestLatch.await();
+                    try
+                    {
+                        Thread.sleep(333);
+                    }
+                    catch (InterruptedException ie)
+                    {
+                    }
+                    
+                    if ( bIOBgThreadFinished )
+                        break;
                 }
-                catch (InterruptedException ie)
+                
+                //System.out.println("Dropped out");
+                
+                if ( ((sUseAdbPullToDownload != null) && (sUseAdbPullToDownload.equals("true"))) &&
+                     ((sDownloadDir != null) && (! sDownloadDir.equals("null")) && (sDownloadDir.length() > 0)) &&
+                     (bUseDirect == false) )    
                 {
+                    // Delay a little..
+                    try
+                    {
+                        Thread.sleep(1500);
+                    }
+                    catch (InterruptedException ie)
+                    {
+                    }
+                    
+                    sb = new StringBuffer();
+                    
+                    if ( iOS == LINUX_MAC )
+                    {
+                        sb.append("export PATH=${PATH}:");
+                        sb.append(androidSdkPathS);
+                        sb.append("/platform-tools");
+                        sb.append(";adb ");
+                    }
+                    else
+                    {
+                        sb.append("SET PATH=");
+                        sb.append(androidSdkPathS);
+                        sb.append("/platform-tools");
+                        sb.append(";%PATH%");
+                        sb.append("&&adb ");
+                    }
+    
+                    if ( (sDeviceName != null) && (sDeviceName.length() > 0) )
+                    {
+                        sb.append("-s ");
+                        sb.append(sDeviceName);
+                        sb.append(" ");
+                    }
+                    
+                    sb.append("pull ");
+                    
+                    sb.append(" /sdcard/");
+                    sb.append(sBNm.toString());
+                    
+                    sb.append(" ");
+                    sb.append('"');
+                    sb.append(sDownloadDir);    // Like:  "C:/Users/Joe Siebenmann/Downloads"
+                    sb.append('"');
+                    
+                    //System.out.println("sb: '"+sb.toString()+"'");
+                    
+                    if ( iOS == WINDOWS )
+                        sb.append("\n");
+                    
+                    // Set up for IOBgThread output..
+                    commandS = sb.toString();
+    
+                    sc = SingletonClass.getInstance();
+                    sc.s_sCommand = commandS;
+                    
+                    iOBgThread = new IOBgThread();
+                    iOBgThread.start();
                 }
-/**/                
 			}
 			else if ( REFRESH.equals(sActionCommand) )
 			{
@@ -4845,8 +4943,9 @@ public class ADB_Util
                     if ( sT.equals("*") )
                         break;
 
-                    //System.out.println("["+iTokIndex+"]: '"+tokSa[iTokIndex]+"'");                    
-                    tokSa[iTokIndex] = sT;
+                    //System.out.println("["+iTokIndex+"]: '"+tokSa[iTokIndex]+"'");
+                    if ( (tokSa != null) && (iTokIndex < tokSa.length) )                   
+                        tokSa[iTokIndex] = sT;
                 }
 
                 if ( (tokSa != null) && (tokSa.length > 0) )
@@ -4947,6 +5046,9 @@ public class ADB_Util
                         // Set up for IOBgThread output..
                         commandS = sb.toString();
                         
+                        SingletonClass sc = SingletonClass.getInstance();
+                        sc.s_sCommand = commandS;
+                        
                         bIOBgThreadFinished = false;
                         iOBgThread = new IOBgThread();
                         iOBgThread.start();
@@ -5001,6 +5103,8 @@ public class ADB_Util
 			    
 			    RefreshProperties();
                 sb = new StringBuffer();
+                
+                // Like:  'Screenrecord_2024-12-02-11-50.mp4'
                 sBNm = new StringBuffer();
                 sBNm.append("Screenrecord_");
                 
@@ -5076,10 +5180,91 @@ public class ADB_Util
                 //System.out.println("sb: '"+sb.toString()+"'");
                 // Set up for IOBgThread output..
                 commandS = sb.toString();
+
+                sc = SingletonClass.getInstance();
+                sc.s_sCommand = commandS;
                 
+                bIOBgThreadFinished = false;
                 iOBgThread = new IOBgThread();
                 iOBgThread.start();
                 
+                while ( true )
+                {
+                    try
+                    {
+                        Thread.sleep(333);
+                    }
+                    catch (InterruptedException ie)
+                    {
+                    }
+                    
+                    if ( bIOBgThreadFinished )
+                        break;
+                }
+                
+                //System.out.println("Dropped out");
+                
+                if ( ((sUseAdbPullToDownload != null) && (sUseAdbPullToDownload.equals("true"))) &&
+                     ((sDownloadDir != null) && (! sDownloadDir.equals("null")) && (sDownloadDir.length() > 0)) )    
+                {
+                    // Delay a little..
+                    try
+                    {
+                        Thread.sleep(1500);
+                    }
+                    catch (InterruptedException ie)
+                    {
+                    }
+                    
+                    sb = new StringBuffer();
+                    
+                    if ( iOS == LINUX_MAC )
+                    {
+                        sb.append("export PATH=${PATH}:");
+                        sb.append(androidSdkPathS);
+                        sb.append("/platform-tools");
+                        sb.append(";adb ");
+                    }
+                    else
+                    {
+                        sb.append("SET PATH=");
+                        sb.append(androidSdkPathS);
+                        sb.append("/platform-tools");
+                        sb.append(";%PATH%");
+                        sb.append("&&adb ");
+                    }
+    
+                    if ( (sDeviceName != null) && (sDeviceName.length() > 0) )
+                    {
+                        sb.append("-s ");
+                        sb.append(sDeviceName);
+                        sb.append(" ");
+                    }
+                    
+                    sb.append("pull ");
+                    
+                    sb.append(" /sdcard/");
+                    sb.append(sBNm.toString());
+                    
+                    sb.append(" ");
+                    sb.append('"');
+                    sb.append(sDownloadDir);    // Like:  "C:/Users/Joe Siebenmann/Downloads"
+                    sb.append('"');
+                    
+                    //System.out.println("sb: '"+sb.toString()+"'");
+                    
+                    if ( iOS == WINDOWS )
+                        sb.append("\n");
+                    
+                    // Set up for IOBgThread output..
+                    commandS = sb.toString();
+    
+                    sc = SingletonClass.getInstance();
+                    sc.s_sCommand = commandS;
+                    
+                    iOBgThread = new IOBgThread();
+                    iOBgThread.start();
+                }
 			}
 			else if ( LIST_PIDS.equals(sActionCommand) ||
 			    LIST_PACKAGES.equals(sActionCommand) ||
@@ -5175,6 +5360,9 @@ public class ADB_Util
                 //System.out.println("sb: '"+sb.toString()+"'");
                 // Set up for IOBgThread output..
                 commandS = sb.toString();
+
+                sc = SingletonClass.getInstance();
+                sc.s_sCommand = commandS;
                 
                 iOBgThread = new IOBgThread();
                 iOBgThread.start();
@@ -5465,7 +5653,8 @@ public class ADB_Util
                     if ( sT.equals("*") )
                         break;
                     
-                    tokSa[iTokIndex] = sT;
+                    if ( (tokSa != null) && (iTokIndex < tokSa.length) )
+                        tokSa[iTokIndex] = sT;
                 }
 
                 if ( (tokSa != null) && (tokSa.length > 0) )
@@ -5571,6 +5760,9 @@ public class ADB_Util
                         // Set up for IOBgThread output..
                         commandS = sb.toString();
 
+                        SingletonClass sc = SingletonClass.getInstance();
+                        sc.s_sCommand = commandS;
+                        
                         bIOBgThreadFinished = false;                        
                         iOBgThread = new IOBgThread();
                         iOBgThread.start();
@@ -5682,6 +5874,9 @@ public class ADB_Util
                     
                     // Set up for IOBgThread output..
                     commandS = sb.toString();
+                    
+                    sc = SingletonClass.getInstance();
+                    sc.s_sCommand = commandS;
                     
                     iOBgThread = new IOBgThread();
                     iOBgThread.start();
@@ -5840,11 +6035,6 @@ public class ADB_Util
                         sc.sPackageName = sListSelection;
 			            //System.out.println("\nsc.sPackageName: '"+sc.sPackageName+"'");
 
-                        if ( (sShowPackageNameInStatusBar != null) && (sShowPackageNameInStatusBar.equals("true")) )
-                        {
-                            if ( packageLabel != null )
-                                packageLabel.setText(sListSelection);
-                        }
 			        }
 			        else
 			        {
@@ -5893,6 +6083,9 @@ public class ADB_Util
                         
                         // Set up for IOBgThread output..
                         commandS = sb.toString();
+
+                        SingletonClass sc = SingletonClass.getInstance();
+                        sc.s_sCommand = commandS;
                         
                         iOBgThread = new IOBgThread();
                         iOBgThread.start();
@@ -6027,6 +6220,9 @@ public class ADB_Util
 				}
 				
 				commandS = sb.toString();
+
+                SingletonClass sc = SingletonClass.getInstance();
+                sc.s_sCommand = commandS;
 				
 				iOBgThread = new IOBgThread();
 				iOBgThread.start();
@@ -6043,8 +6239,16 @@ public class ADB_Util
                 //System.out.println("bLogcatOn: "+bLogcatOn);			    
 			    if ( bLogcatOn )
 			    {
+			        
+			        if ( iOBgThread != null )
+			        {
+			            iOBgThread.interrupt();
+			        }
+			        
                     // Set to kill IOBgThread..
+                    bIOBgThreadFinished = false;
                     bBreakOut = true;
+                    //System.out.println("Set bBreakOut");
                     
                     // Wait for IOBgThread to end..
                     while ( true )
@@ -6057,7 +6261,6 @@ public class ADB_Util
                         {
                         }
                         
-                        //if ( ! bLogcatOn )
                         if ( bIOBgThreadFinished ) 
                             break;
                     }
@@ -6162,6 +6365,10 @@ public class ADB_Util
                 
                     commandS = sb.toString();
                     //System.out.println("commandS: '"+commandS+"'");
+                    
+                    sc = SingletonClass.getInstance();
+                    sc.s_sCommand = commandS;
+                    
                     bLogcatOn = true;
 
                     // Turn on status message..                    
@@ -6174,23 +6381,25 @@ public class ADB_Util
 			}
 			else if ( WIRELESS_CONNECT.equals(sActionCommand) )
 			{
-			    System.out.println("");
-				System.out.println("WIRELESS_CONNECT");
+			    //System.out.println("");
+				//System.out.println("WIRELESS_CONNECT");
 				
 				bWirelessEnabled = true;
 
 				//System.out.println("bWirelessConnected: "+bWirelessConnected);
 				SingletonClass sc = SingletonClass.getInstance();
 				
-				System.out.println("sc.s_WirelessConnected: "+sc.s_WirelessConnected);
-				if ( sc.s_WirelessConnected )
+				//System.out.println("sc.s_WirelessConnected: "+sc.s_WirelessConnected);
+				//if ( sc.s_WirelessConnected )
+				if ( true )
 				{
 				    // There was a previous connection, disconnect..
 				    WirelessDisconnect();
 				    
 				    try
 				    {
-				         Thread.sleep(2500);   
+				         //Thread.sleep(2500);  
+				         Thread.sleep(1000);
 				    }
 				    catch (InterruptedException ie)
 				    {
@@ -6218,8 +6427,8 @@ public class ADB_Util
 				
 				// Check success..
 				
-				System.out.println("iWirelessErrorCode: "+iWirelessErrorCode);
-				System.out.println("sc.s_WirelessConnected: "+sc.s_WirelessConnected);
+				//System.out.println("iWirelessErrorCode: "+iWirelessErrorCode);
+				//System.out.println("sc.s_WirelessConnected: "+sc.s_WirelessConnected);
 				
 				if ( (iWirelessErrorCode == 0) || sc.s_WirelessConnected )
 				{
@@ -6286,7 +6495,7 @@ public class ADB_Util
 				}
 /**/
 
-				System.out.println("Exiting WIRELESS_CONNECT");
+				//System.out.println("Exiting WIRELESS_CONNECT");
 						
 			}
 			else if ( WIRELESS_DISCONNECT.equals(sActionCommand) )
@@ -6436,6 +6645,13 @@ public class ADB_Util
                     fileBrowserFrame.dispose();
                 }
                 
+/*                
+                if ( selectionList == null )
+                    System.out.println("selectionList null");
+                else
+                    System.out.println("selectionList.size(): "+selectionList.size());
+/**/                    
+                
                 if ( (selectionList != null) && (selectionList.size() > 0) )
                 {
                     for ( int iSelIndex = 0; iSelIndex < selectionList.size(); iSelIndex++ )
@@ -6468,8 +6684,8 @@ public class ADB_Util
                             sb.append(sDeviceName);
                             sb.append(" ");
                         }
-        
-/*                
+
+/*                        
                         if ( sSelectedMenu == null )
                             System.out.println("sSelectedMenu null");
                         else
@@ -6480,12 +6696,15 @@ public class ADB_Util
                         {
                             if ( sSelectedMenu.equals("Push file") )
                             {
+                                System.out.println("Push file");
+                                
                                 //   adb push c:/users/administrator/downloads/ep042019_5day_005.zip /sdcard/ep042019_5day_005.zip
                                 sb.append("push ");
                                 
                                 SingletonClass sc = SingletonClass.getInstance();
                                 sSelectedFile = sc.sSelectedFile;
-/*                        
+
+/*                                
                                 if ( sSelectedFile == null )
                                     System.out.println("(sc)sSelectedFile null");
                                 else
@@ -6536,6 +6755,7 @@ public class ADB_Util
                                         sB.append(sListSelection);
                                         sB.append('"');
                                     }
+                                    
                                     //System.out.println("sB: '"+sB.toString()+"'");
                                     
                                     sb.append(sB.toString());
@@ -6627,7 +6847,10 @@ public class ADB_Util
                         
                         // Set up for IOBgThread output..
                         commandS = sb.toString();
-        
+                        
+                        SingletonClass sc = SingletonClass.getInstance();
+                        sc.s_sCommand = commandS;
+                
                         bIOBgThreadFinished = false;                
                         iOBgThread = new IOBgThread();
                         iOBgThread.start();
@@ -6636,7 +6859,8 @@ public class ADB_Util
                         {
                             try
                             {
-                                Thread.sleep(333);
+                                //Thread.sleep(333);
+                                Thread.sleep(500);
                             }
                             catch (InterruptedException ie)
                             {
@@ -7011,7 +7235,14 @@ public class ADB_Util
 			        bSelectionTimerStarted = true;
 			        bProcess = true;
 			    }
-			   
+
+/*			    
+			    if ( fileBrowserJList == null )
+			        System.out.println("fileBrowserJList null");
+			    else
+			        System.out.println("fileBrowserJList not null");
+/**/			        
+			    
                 if ( fileBrowserJList != null )
                 {
                     //sListSelection = (String)fileBrowserJList.getSelectedValue();
@@ -7026,7 +7257,7 @@ public class ADB_Util
                     
                     selectionList = fileBrowserJList.getSelectedValuesList();
 
-/*			        
+/*                    
                     if ( selectionList == null )
                         System.out.println("selectionList null");
                     else
